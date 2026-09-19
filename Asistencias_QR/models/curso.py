@@ -2,13 +2,13 @@ from dataclasses import asdict, dataclass
 
 
 @dataclass(frozen=True)
-class Sesion:
+class Curso:
     id: int | None
-    curso: str
-    fecha_hora: str
-    token_qr: str
-    qr_file: str | None = None
-    curso_id: int | None = None
+    codigo: str
+    nombre: str
+    seccion: str = ""
+    docente: str = ""
+    estado: str = "activo"
 
     def to_dict(self):
         return asdict(self)

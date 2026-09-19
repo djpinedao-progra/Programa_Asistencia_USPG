@@ -1,4 +1,4 @@
-const state = { students: [], sessions: [], attendances: [] };
+const state = { students: [], courses: [], sessions: [], attendances: [] };
 const $ = (selector) => document.querySelector(selector);
 
 async function api(url, options = {}) {
@@ -22,10 +22,40 @@ function formatDate(value) {
 
 function emptyRow(columns, message) { return `<tr><td colspan="${columns}" class="empty-state">${message}</td></tr>`; }
 
+function escapeHtml(value) {
+  const element = document.createElement('div');
+  element.textContent = value ?? '';
+  return element.innerHTML;
+}
+
 function renderStudents() {
   $('#student-count').textContent = state.students.length;
   $('#student-table-count').textContent = state.students.length;
   $('#students-table').innerHTML = state.students.length ? state.students.map(student => `<tr><td><strong>${student.carnet}</strong></td><td>${student.nombre}<small class="muted-cell">${student.correo}</small></td><td>${student.carrera}</td><td><span class="pill">${student.estado}</span></td></tr>`).join('') : emptyRow(4, 'No hay estudiantes registrados.');
+}
+
+function renderCourses() {
+  $('#course-count').textContent = state.courses.length;
+  $('#course-table-count').textContent = state.courses.length;
+  $('#courses-table').innerHTML = state.courses.length ? state.courses.map(course => `<tr>
+    <td><strong>${escapeHtml(course.codigo)}</strong></td>
+    <td>${escapeHtml(course.nombre)}</td>
+    <td>${escapeHtml(course.seccion) || '—'}</td>
+    <td>${escapeHtml(course.docente) || '—'}</td>
+    <td><span class="pill ${course.estado === 'inactivo' ? 'pill-inactive' : ''}">${escapeHtml(course.estado)}</span></td>
+    <td class="action-cell"><button class="table-action" data-course-edit="${course.id}">Editar</button><button class="table-action danger" data-course-delete="${course.id}">Eliminar</button></td>
+  </tr>`).join('') : emptyRow(6, 'No hay cursos registrados.');
+
+  const courseSelect = $('#session-course');
+  const selectedCourse = courseSelect.value;
+  const activeCourses = state.courses.filter(course => course.estado === 'activo');
+  courseSelect.innerHTML = activeCourses.length
+    ? `<option value="">Selecciona un curso</option>${activeCourses.map(course => `<option value="${course.id}">${escapeHtml(course.codigo)} · ${escapeHtml(course.nombre)}${course.seccion ? ` · ${escapeHtml(course.seccion)}` : ''}</option>`).join('')}`
+    : '<option value="">Primero registra un curso activo</option>';
+  courseSelect.value = selectedCourse;
+
+  document.querySelectorAll('[data-course-edit]').forEach(button => button.addEventListener('click', () => startCourseEdit(Number(button.dataset.courseEdit))));
+  document.querySelectorAll('[data-course-delete]').forEach(button => button.addEventListener('click', () => deleteCourse(Number(button.dataset.courseDelete))));
 }
 
 function renderSessions() {
@@ -44,8 +74,8 @@ function renderAttendances() {
 
 async function loadData() {
   try {
-    [state.students, state.sessions, state.attendances] = await Promise.all([api('/api/estudiantes'), api('/api/sesiones'), api('/api/asistencias')]);
-    renderStudents(); renderSessions(); renderAttendances();
+    [state.students, state.courses, state.sessions, state.attendances] = await Promise.all([api('/api/estudiantes'), api('/api/cursos'), api('/api/sesiones'), api('/api/asistencias')]);
+    renderStudents(); renderCourses(); renderSessions(); renderAttendances();
   } catch (error) { showToast(error.message, true); }
 }
 
@@ -70,7 +100,7 @@ function navigate(section) {
   document.querySelectorAll('.page-section').forEach(item => item.classList.remove('active-section'));
   $(`#section-${section}`).classList.add('active-section');
   document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.section === section));
-  const titles = { resumen: 'Resumen operativo', estudiantes: 'Estudiantes', sesiones: 'Sesiones QR', asistencias: 'Registrar asistencia' };
+  const titles = { resumen: 'Resumen operativo', estudiantes: 'Estudiantes', cursos: 'Gestión de cursos', sesiones: 'Sesiones QR', asistencias: 'Registrar asistencia' };
   $('#page-title').textContent = titles[section];
   window.location.hash = section;
 }
@@ -103,10 +133,63 @@ $('#student-form').addEventListener('submit', async event => {
   try { await api('/api/estudiantes', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) }); event.target.reset(); await loadData(); showToast('Estudiante registrado correctamente'); } catch (error) { showToast(error.message, true); }
 });
 
+function resetCourseForm() {
+  const form = $('#course-form');
+  form.reset();
+  form.elements.id.value = '';
+  $('#course-form-title').textContent = 'Nuevo curso';
+  $('#course-submit').firstChild.textContent = 'Registrar curso ';
+  $('#course-cancel').classList.add('hidden');
+}
+
+function startCourseEdit(courseId) {
+  const course = state.courses.find(item => item.id === courseId);
+  if (!course) return;
+  const form = $('#course-form');
+  Object.entries(course).forEach(([key, value]) => {
+    if (form.elements[key]) form.elements[key].value = value ?? '';
+  });
+  $('#course-form-title').textContent = 'Editar curso';
+  $('#course-submit').firstChild.textContent = 'Guardar cambios ';
+  $('#course-cancel').classList.remove('hidden');
+  navigate('cursos');
+  form.elements.codigo.focus();
+}
+
+async function deleteCourse(courseId) {
+  const course = state.courses.find(item => item.id === courseId);
+  if (!course || !window.confirm(`¿Eliminar el curso ${course.codigo} · ${course.nombre}?`)) return;
+  try {
+    await api(`/api/cursos/${courseId}`, { method: 'DELETE' });
+    if (Number($('#course-form').elements.id.value) === courseId) resetCourseForm();
+    await loadData();
+    showToast('Curso eliminado correctamente');
+  } catch (error) { showToast(error.message, true); }
+}
+
+$('#course-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.target));
+  const courseId = values.id;
+  delete values.id;
+  try {
+    await api(courseId ? `/api/cursos/${courseId}` : '/api/cursos', {
+      method: courseId ? 'PUT' : 'POST', body: JSON.stringify(values)
+    });
+    resetCourseForm();
+    await loadData();
+    showToast(courseId ? 'Curso actualizado correctamente' : 'Curso registrado correctamente');
+  } catch (error) { showToast(error.message, true); }
+});
+
+$('#course-cancel').addEventListener('click', resetCourseForm);
+
 $('#session-form').addEventListener('submit', async event => {
   event.preventDefault();
   const form = new FormData(event.target);
-  try { const session = await api('/api/sesiones', { method: 'POST', body: JSON.stringify(Object.fromEntries(form)) }); event.target.reset(); $('#qr-result').innerHTML = `<img src="/static/qr_codes/sesion_${session.id}.png" alt="Código QR de ${session.curso}"><div class="qr-info"><strong>Sesión #${session.id} · ${session.curso}</strong><code>${session.token_qr}</code></div>`; await loadData(); showToast('Sesión creada y QR generado'); } catch (error) { showToast(error.message, true); }
+  const values = Object.fromEntries(form);
+  values.curso_id = Number(values.curso_id);
+  try { const session = await api('/api/sesiones', { method: 'POST', body: JSON.stringify(values) }); event.target.reset(); $('#qr-result').innerHTML = `<img src="/static/qr_codes/sesion_${session.id}.png" alt="Código QR de ${escapeHtml(session.curso)}"><div class="qr-info"><strong>Sesión #${session.id} · ${escapeHtml(session.curso)}</strong><code>${session.token_qr}</code></div>`; await loadData(); showToast('Sesión creada y QR generado'); } catch (error) { showToast(error.message, true); }
 });
 
 $('#attendance-form').addEventListener('submit', async event => {
@@ -117,6 +200,6 @@ $('#attendance-form').addEventListener('submit', async event => {
 });
 
 const initialSection = window.location.hash.replace('#', '') || 'resumen';
-navigate(['resumen', 'estudiantes', 'sesiones', 'asistencias'].includes(initialSection) ? initialSection : 'resumen');
+navigate(['resumen', 'estudiantes', 'cursos', 'sesiones', 'asistencias'].includes(initialSection) ? initialSection : 'resumen');
 loadData();
 loadGoogleStatus();
