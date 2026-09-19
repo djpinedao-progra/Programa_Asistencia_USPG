@@ -14,3 +14,12 @@ def crear_sesion():
         return jsonify({"status": "ok", "data": sesion.to_dict()}), 201
     except ValueError as error:
         return jsonify({"status": "error", "message": str(error)}), 400
+
+
+@sesion_bp.get("/api/sesiones")
+def listar_sesiones():
+    with get_connection() as connection:
+        sesiones = connection.execute(
+            "SELECT id, curso, fecha_hora, token_qr FROM sesiones ORDER BY id DESC"
+        ).fetchall()
+    return jsonify({"status": "ok", "data": [dict(sesion) for sesion in sesiones]})
