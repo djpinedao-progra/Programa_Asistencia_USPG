@@ -1,5 +1,3 @@
-Asistencias_QR/client_secret.json
-Asistencias_QR/google_token.pickle
 Asistencias_QR/database/asistencias.db
 __pycache__/
 *.py[cod]

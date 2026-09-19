@@ -79,23 +79,6 @@ async function loadData() {
   } catch (error) { showToast(error.message, true); }
 }
 
-async function loadGoogleStatus() {
-  try {
-    const status = await api('/api/google/status');
-    const badge = $('#google-status');
-    if (status.connected) {
-      badge.textContent = 'Conectado';
-      badge.classList.add('connected');
-      const courses = await api('/api/google/cursos');
-      $('#google-courses').innerHTML = courses.length
-        ? courses.map(course => `<option value="${course.id}">${course.name}${course.section ? ` · ${course.section}` : ''}</option>`).join('')
-        : '<option value="">No hay cursos activos</option>';
-    } else if (!status.configured) {
-      badge.textContent = 'Configurar OAuth';
-    }
-  } catch (error) { showToast(error.message, true); }
-}
-
 function navigate(section) {
   document.querySelectorAll('.page-section').forEach(item => item.classList.remove('active-section'));
   $(`#section-${section}`).classList.add('active-section');
@@ -107,25 +90,6 @@ function navigate(section) {
 
 document.querySelectorAll('[data-section]').forEach(link => link.addEventListener('click', event => { event.preventDefault(); navigate(link.dataset.section); }));
 $('#refresh-all').addEventListener('click', loadData);
-$('#google-login').addEventListener('click', async () => {
-  const status = await api('/api/google/status');
-  if (!status.configured) {
-    showToast('Agrega client_secret.json antes de conectar Google', true);
-    return;
-  }
-  window.location.href = '/google/login';
-});
-
-$('#google-sync').addEventListener('click', async () => {
-  const courseId = $('#google-courses').value;
-  try {
-    const result = await api('/api/google/sincronizar', {
-      method: 'POST', body: JSON.stringify({ course_id: courseId })
-    });
-    await loadData();
-    showToast(`${result.imported} estudiantes importados de ${result.found} encontrados`);
-  } catch (error) { showToast(error.message, true); }
-});
 
 $('#student-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -202,4 +166,3 @@ $('#attendance-form').addEventListener('submit', async event => {
 const initialSection = window.location.hash.replace('#', '') || 'resumen';
 navigate(['resumen', 'estudiantes', 'cursos', 'sesiones', 'asistencias'].includes(initialSection) ? initialSection : 'resumen');
 loadData();
-loadGoogleStatus();
