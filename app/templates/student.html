@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Mi asistencia{% endblock %}
+{% block head %}<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">ESPACIO DEL ALUMNO</p><h1>Mi asistencia</h1><p class="muted">Escanea el QR que comparte tu docente para marcar presencia.</p></div>
+  <button class="button button-primary scan-launch" type="button" data-scan-toggle><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3m8 0h3a1 1 0 0 1 1 1v3m0 8v3a1 1 0 0 1-1 1h-3m-8 0H5a1 1 0 0 1-1-1v-3M8 8h8v8H8z"/></svg> Escanear QR</button>
+</div>
+<section class="scanner-panel" data-scanner hidden>
+  <div class="scanner-head"><div><p class="eyebrow">LECTOR DE CÁMARA</p><h2>Enfoca el código QR</h2></div><button class="icon-button" type="button" data-scan-close aria-label="Cerrar lector" title="Cerrar lector">×</button></div>
+  <div id="qr-reader"></div><p class="scanner-message" data-scan-message>Permite el acceso a la cámara para continuar.</p>
+  <form method="post" action="{{ url_for('main.record_attendance') }}" class="scan-submit" data-scan-form hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="token"><span data-scan-success></span><button class="button button-primary" type="submit">Registrar asistencia <span aria-hidden="true">→</span></button></form>
+</section>
+<section class="data-section student-records"><div class="section-heading"><div><p class="eyebrow">HISTORIAL</p><h2>Clases registradas</h2></div><span class="section-number">{{ attendances|length }}</span></div>
+  <div class="table-wrap"><table><thead><tr><th>Curso</th><th>Código</th><th>Fecha</th><th>Hora</th></tr></thead><tbody>
+    {% for attendance in attendances %}<tr><td class="primary-cell">{{ attendance.session.course.name }}</td><td>{{ attendance.session.course.code }}</td><td>{{ attendance.recorded_at.strftime('%d/%m/%Y') }}</td><td><span class="time-cell">{{ attendance.recorded_at.strftime('%H:%M') }}</span></td></tr>
+    {% else %}<tr><td colspan="4" class="empty-cell">Tu historial de asistencia aparecerá aquí.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

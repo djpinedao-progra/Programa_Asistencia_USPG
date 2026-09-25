@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Administración{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">ADMINISTRACIÓN</p><h1>Comunidad académica</h1><p class="muted">Gestiona accesos y consulta los cursos activos.</p></div>
+  <span class="heading-count">{{ users|length }} <small>cuentas</small></span>
+</div>
+<div class="admin-grid">
+  <section class="panel form-panel">
+    <div class="section-heading"><div><p class="eyebrow">NUEVA CUENTA</p><h2>Agregar usuario</h2></div><span class="section-number">01</span></div>
+    <form method="post" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="name">Nombre completo</label><input id="name" name="name" placeholder="Nombre y apellido" required>
+      <label for="new-email">Correo institucional</label><input id="new-email" name="email" type="email" placeholder="nombre@uspg.edu" required>
+      <label for="role">Rol</label>
+      <select id="role" name="role" required><option value="">Selecciona un rol</option><option value="docente">Docente</option><option value="alumno">Alumno</option><option value="admin">Administrador</option></select>
+      <label for="new-carnet">Carnet institucional <span class="optional-label">requerido para alumno</span></label><input id="new-carnet" name="carnet" inputmode="numeric" pattern="[0-9]{7}" placeholder="Ej. 2600403">
+      <label for="new-password">Contraseña inicial</label><input id="new-password" name="password" type="password" data-password-input required>
+      <div class="password-feedback" data-password-meter hidden><div class="password-meter"><span></span></div><strong data-password-label></strong><ul data-password-tips></ul></div>
+      <button class="button button-primary" type="submit">Crear cuenta <span aria-hidden="true">+</span></button>
+    </form>
+  </section>
+  <section class="data-section">
+    <div class="section-heading"><div><p class="eyebrow">DIRECTORIO</p><h2>Usuarios registrados</h2></div><span class="section-number">{{ users|length }}</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Carnet</th><th>Correo</th><th>Rol</th><th>Información académica</th><th>Cuenta desde</th></tr></thead><tbody>
+      {% for user in users %}<tr><td class="primary-cell">{{ user.name }}</td><td>{% if user.role == 'alumno' and not user.carnet %}<form class="carnet-inline-form" method="post" action="{{ url_for('main.update_student_carnet', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="carnet" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" placeholder="2600403" aria-label="Carnet de {{ user.name }}" required><button class="text-link" type="submit">Guardar</button></form>{% else %}{{ user.carnet or '—' }}{% endif %}</td><td>{{ user.email }}</td><td><span class="role-pill role-{{ user.role }}">{{ {'admin': 'Admin', 'docente': 'Docente', 'alumno': 'Alumno'}[user.role] }}</span></td><td>{% if user.role == 'docente' %}{{ user.courses|map(attribute='code')|join(', ') or 'Sin cursos' }}{% elif user.role == 'alumno' %}{{ user.attendances|length }} asistencias{% else %}—{% endif %}</td><td>{{ user.created_at.strftime('%d/%m/%Y') if user.created_at else '—' }}</td></tr>
+      {% else %}<tr><td colspan="6" class="empty-cell">Aún no hay usuarios.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="section-heading course-heading"><div><p class="eyebrow">OFERTA ACADÉMICA</p><h2>Cursos</h2></div><span class="section-number">{{ courses|length }}</span></div>
+    <div class="course-list">
+      {% for course in courses %}<div class="course-row"><div><strong>{{ course.name }}</strong><span>{{ course.code }} · {{ course.teacher.name }}</span></div><div class="download-links"><a class="text-link" href="{{ url_for('main.export_attendance', course_id=course.id) }}">CSV</a><a class="text-link" href="{{ url_for('main.export_attendance_pdf', course_id=course.id) }}">PDF ↗</a></div></div>
+      {% else %}<p class="empty-cell">Todavía no hay cursos.</p>{% endfor %}
+    </div>
+    <div class="section-heading course-heading"><div><p class="eyebrow">REGISTRO COMPLETO</p><h2>Asistencias de todos los cursos</h2></div><span class="section-number">{{ attendances|length }}</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Alumno</th><th>Carnet</th><th>Correo</th><th>Curso</th><th>Docente</th><th>Fecha</th><th>Hora</th></tr></thead><tbody>
+      {% for attendance in attendances %}<tr><td class="primary-cell">{{ attendance.student.name }}</td><td>{{ attendance.student.carnet or '—' }}</td><td>{{ attendance.student.email }}</td><td>{{ attendance.session.course.code }}</td><td>{{ attendance.session.course.teacher.name }}</td><td>{{ attendance.recorded_at.strftime('%d/%m/%Y') }}</td><td>{{ attendance.recorded_at.strftime('%H:%M') }}</td></tr>
+      {% else %}<tr><td colspan="7" class="empty-cell">No hay registros de asistencia.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}

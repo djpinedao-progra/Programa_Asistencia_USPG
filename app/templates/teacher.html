@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Panel docente{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">ESPACIO DOCENTE</p><h1>Tus cursos</h1><p class="muted">Abre una sesión y comparte el QR con tu clase.</p></div>
+  <span class="heading-count">{{ courses|length }} <small>cursos</small></span>
+</div>
+<div class="teacher-grid">
+  <section class="data-section">
+    <div class="section-heading"><div><p class="eyebrow">CURSOS ASIGNADOS</p><h2>Lista de cursos</h2></div><span class="section-number">{{ courses|length }}</span></div>
+    <div class="course-list course-list-large">
+      {% for course in courses %}<div class="course-row"><div class="course-symbol">{{ course.code[:1] }}</div><div class="course-info"><strong>{{ course.name }}</strong><span>{{ course.code }}</span></div><form method="post" action="{{ url_for('main.create_attendance_session', course_id=course.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button button-small" type="submit">Abrir asistencia <span aria-hidden="true">↗</span></button></form></div>
+      {% else %}<div class="empty-state"><span class="empty-icon">＋</span><strong>Sin cursos por ahora</strong><p>Crea un curso para comenzar a tomar asistencia.</p></div>{% endfor %}
+    </div>
+  </section>
+  <section class="panel form-panel">
+    <div class="section-heading"><div><p class="eyebrow">CONFIGURACIÓN</p><h2>Crear curso</h2></div><span class="section-number">＋</span></div>
+    <form method="post" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="course-name">Nombre del curso</label><input id="course-name" name="name" placeholder="Ej. Introducción a la programación" required>
+      <label for="course-code">Código</label><input id="course-code" name="code" placeholder="INF-101" required>
+      <button class="button button-outline" type="submit">Guardar curso <span aria-hidden="true">+</span></button>
+    </form>
+    <div class="note-block"><span class="note-icon">i</span><p>Cada código de curso debe ser único dentro de la universidad.</p></div>
+  </section>
+</div>
+{% endblock %}

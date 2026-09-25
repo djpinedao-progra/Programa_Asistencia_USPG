@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Crear cuenta de estudiante{% endblock %}
+{% block content %}
+<section class="register-layout">
+  <div class="register-intro"><a class="brand brand-light" href="{{ url_for('main.login') }}"><span class="brand-mark">U</span><span><strong>USPG</strong><small>Universidad</small></span></a><p class="eyebrow">PORTAL DE ESTUDIANTES</p><h1>Tu carnet.<br>Tu espacio.</h1><p>Regístrate con tus datos institucionales para consultar y marcar tu asistencia.</p></div>
+  <div class="register-panel"><div class="register-form-wrap"><p class="eyebrow">ALTA DE ESTUDIANTE</p><h2>Crear cuenta</h2><p class="muted">Este portal crea exclusivamente cuentas de alumno.</p>
+    <form method="post" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="name">Nombre completo</label><input id="name" name="name" autocomplete="name" placeholder="Nombre y apellido" required>
+      <label for="carnet">Carnet institucional</label><input id="carnet" name="carnet" inputmode="numeric" autocomplete="off" pattern="[0-9]{7}" minlength="7" maxlength="7" placeholder="Ej. 2600403" required>
+      <span class="field-hint">Ingresa los 7 dígitos de tu carnet.</span>
+      <label for="email">Correo institucional</label><input id="email" name="email" type="email" autocomplete="email" placeholder="nombre@uspg.edu" required>
+      <label for="password">Crea una contraseña</label><input id="password" name="password" type="password" autocomplete="new-password" data-password-input required>
+      <div class="password-feedback" data-password-meter hidden><div class="password-meter"><span></span></div><strong data-password-label></strong><ul data-password-tips></ul><p>El indicador es orientativo; elige una contraseña que no uses en otros sitios.</p></div>
+      <button class="button button-primary button-wide" type="submit">Crear cuenta <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="register-link">¿Ya tienes cuenta? <a href="{{ url_for('main.login') }}">Inicia sesión</a></p>
+  </div></div>
+</section>
+{% endblock %}

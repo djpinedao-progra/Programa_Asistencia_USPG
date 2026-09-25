@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión{% endblock %}
+{% block content %}
+<section class="login-layout">
+  <div class="login-aside">
+    <div class="brand brand-light"><span class="brand-mark">U</span><span><strong>USPG</strong><small>Universidad</small></span></div>
+    <div class="aside-copy">
+      <p class="eyebrow">GESTIÓN ACADÉMICA</p>
+      <h1>Asistencia,<br>sin interrupciones.</h1>
+      <p>Un registro claro para cada clase, desde el aula o el teléfono.</p>
+    </div>
+    <span class="aside-index">CAMPUS DIGITAL <b>01 / 03</b></span>
+  </div>
+  <div class="login-panel">
+    <div class="login-form-wrap">
+      <p class="eyebrow">BIENVENIDO DE NUEVO</p>
+      <h2>Inicia sesión</h2>
+      <p class="muted">Usa las credenciales de tu cuenta institucional.</p>
+      <form method="post" class="stack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="identifier">Correo o carnet institucional</label>
+        <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="nombre@uspg.edu o 2600403" required autofocus>
+        <label for="password">Contraseña</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Tu contraseña" required>
+        <button class="button button-primary button-wide" type="submit">Entrar <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="login-note"><span class="status-dot"></span> Acceso protegido para la comunidad USPG</p>
+      <p class="register-link">¿Eres estudiante nuevo? <a href="{{ url_for('main.student_registration') }}">Crea tu cuenta</a></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

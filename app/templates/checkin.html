@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Confirmar asistencia{% endblock %}
+{% block content %}
+<section class="checkin-wrap"><div class="checkin-mark">✓</div><p class="eyebrow">CÓDIGO LEÍDO</p><h1>Confirma tu asistencia</h1><p class="muted">Registra tu presencia en esta sesión. El código solo se puede usar una vez.</p>
+  <form method="post" action="{{ url_for('main.record_attendance') }}" class="stack-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="token" value="{{ qr_token }}"><button class="button button-primary button-wide" type="submit">Registrar asistencia <span aria-hidden="true">→</span></button></form>
+  <a class="back-link checkin-back" href="{{ url_for('main.student_dashboard') }}">Volver al panel</a>
+</section>
+{% endblock %}

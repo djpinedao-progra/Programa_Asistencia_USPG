@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}QR de asistencia{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('main.teacher_dashboard') }}">← Volver a tus cursos</a>
+<div class="page-heading session-heading"><div><p class="eyebrow">SESIÓN DE CLASE</p><h1>{{ attendance_session.course.name }}</h1><p class="muted">{{ attendance_session.course.code }} · QR temporal para esta clase</p></div><span class="live-label {% if expired %}is-expired{% endif %}"><span></span>{% if expired %}VENCIDO{% else %}ACTIVO{% endif %}</span></div>
+<div class="session-layout">
+  <section class="qr-stage">
+    {% if expired %}<div class="qr-expired"><span>⌁</span><strong>El código ha vencido</strong><p>Abre una nueva sesión desde la lista de cursos.</p></div>{% else %}<div class="qr-frame"><img src="data:image/png;base64,{{ qr_data }}" alt="Código QR de asistencia para {{ attendance_session.course.name }}"></div><p class="qr-caption">Escanéalo con la cámara o desde el panel del alumno</p>{% endif %}
+    <div class="session-meta"><div><span>VENCE A LAS</span><strong>{{ attendance_session.expires_at.strftime('%H:%M') }}</strong></div><div><span>REGISTROS</span><strong>{{ attendances|length }}</strong></div></div>
+  </section>
+  <section class="attendance-section"><div class="section-heading"><div><p class="eyebrow">EN ESTA CLASE</p><h2>Asistencias</h2></div><div class="download-links"><a class="icon-button download-button" href="{{ url_for('main.export_attendance', course_id=attendance_session.course_id) }}" aria-label="Descargar CSV" title="Descargar CSV">CSV</a><a class="icon-button download-button" href="{{ url_for('main.export_attendance_pdf', course_id=attendance_session.course_id) }}" aria-label="Descargar PDF" title="Descargar PDF">PDF</a></div></div>
+    <div class="attendance-count"><strong>{{ attendances|length }}</strong><span>alumnos han marcado asistencia en el curso</span></div>
+    <div class="attendance-list">
+      {% for attendance in attendances %}<div class="attendance-row"><span class="avatar">{{ attendance.student.name[:1]|upper }}</span><div><strong>{{ attendance.student.name }}</strong><span>{{ attendance.student.email }}</span></div><time>{{ attendance.recorded_at.strftime('%H:%M') }}</time></div>
+      {% else %}<div class="empty-state"><span class="empty-icon">◷</span><strong>Aún no hay registros</strong><p>Los alumnos aparecerán aquí al escanear el QR.</p></div>{% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
