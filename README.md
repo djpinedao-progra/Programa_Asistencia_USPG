@@ -45,7 +45,7 @@ Entra en `http://localhost:5000`. El administrador crea cuentas de docentes; los
 
 ## Escaneo desde celular
 
-Para que un teléfono alcance al servidor, ambos dispositivos deben estar en la misma red. Configura `APP_BASE_URL` con la dirección local de la computadora, por ejemplo `http://192.168.1.10:5000`, y permite el puerto 5000 en el firewall. Los navegadores móviles suelen exigir HTTPS para habilitar la cámara fuera de `localhost`; en ese caso publica la app detrás de un proxy con TLS. El alumno inicia sesión, toca **Escanear QR**, permite la cámara y confirma el registro.
+Para que un teléfono alcance al servidor, ambos dispositivos deben estar en la misma red. Configura `APP_BASE_URL` con la dirección pública segura de la aplicación y publícala detrás de un proxy con TLS; los navegadores móviles exigen HTTPS para solicitar permiso y habilitar la cámara. La dirección HTTP de la computadora en la red local no permite escanear desde la mayoría de los teléfonos. El alumno inicia sesión, toca **Escanear QR**, acepta el permiso de cámara del navegador y confirma el registro.
 
 ## Diseño y seguridad
 

@@ -8,7 +8,7 @@
 </div>
 <section class="scanner-panel" data-scanner hidden>
   <div class="scanner-head"><div><p class="eyebrow">LECTOR DE CÁMARA</p><h2>Enfoca el código QR</h2></div><button class="icon-button" type="button" data-scan-close aria-label="Cerrar lector" title="Cerrar lector">×</button></div>
-  <div id="qr-reader"></div><p class="scanner-message" data-scan-message>Permite el acceso a la cámara para continuar.</p>
+  <div id="qr-reader"></div><p class="scanner-message" data-scan-message role="status" aria-live="polite">Al tocar Escanear QR, el navegador solicitará permiso para usar la cámara.</p>
   <form method="post" action="{{ url_for('main.record_attendance') }}" class="scan-submit" data-scan-form hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="token"><span data-scan-success></span><button class="button button-primary" type="submit">Registrar asistencia <span aria-hidden="true">→</span></button></form>
 </section>
 <section class="data-section student-records"><div class="section-heading"><div><p class="eyebrow">HISTORIAL</p><h2>Clases registradas</h2></div><span class="section-number">{{ attendances|length }}</span></div>

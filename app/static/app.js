@@ -42,6 +42,19 @@
   const success = panel.querySelector("[data-scan-success]");
   let scanner;
 
+  const cameraErrorMessage = (error) => {
+    if (!window.isSecureContext) {
+      return "La cámara en el móvil requiere una conexión HTTPS. Abre el sitio con una dirección segura e inténtalo de nuevo.";
+    }
+    if (["NotAllowedError", "PermissionDeniedError"].includes(error?.name)) {
+      return "No se concedió el permiso de cámara. Habilítalo en los ajustes del navegador y vuelve a tocar Escanear QR.";
+    }
+    if (["NotFoundError", "DevicesNotFoundError"].includes(error?.name)) {
+      return "No se encontró una cámara disponible en este dispositivo.";
+    }
+    return "No se pudo abrir la cámara. Revisa los permisos del navegador y que ninguna otra aplicación la esté usando.";
+  };
+
   const stopScanner = async () => {
     if (scanner?.isScanning) await scanner.stop();
     if (scanner) await scanner.clear();
@@ -54,12 +67,17 @@
     panel.hidden = false;
     launch.hidden = true;
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      message.textContent = cameraErrorMessage();
+      return;
+    }
     if (!window.Html5Qrcode) {
       message.textContent = "No se pudo cargar el lector. Revisa tu conexión e inténtalo de nuevo.";
       return;
     }
     scanner = new Html5Qrcode("qr-reader");
     try {
+      message.textContent = "Solicitando permiso para usar la cámara...";
       await scanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 230, height: 230 }, aspectRatio: 1 },
@@ -79,8 +97,8 @@
         },
         () => {},
       );
-    } catch (_) {
-      message.textContent = "No se pudo acceder a la cámara. Verifica los permisos del navegador.";
+    } catch (error) {
+      message.textContent = cameraErrorMessage(error);
     }
   });
 
