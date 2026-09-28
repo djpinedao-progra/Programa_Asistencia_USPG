@@ -90,6 +90,7 @@ def create_app(test_config=None):
                 "schedule": "VARCHAR(180) NOT NULL DEFAULT ''",
                 "location_type": "VARCHAR(20) NOT NULL DEFAULT 'presencial'",
                 "classroom": "VARCHAR(100) NOT NULL DEFAULT ''",
+                "is_active": "BOOLEAN NOT NULL DEFAULT 1",
             },
             "attendance_sessions": {"closed_at": "DATETIME"},
             "attendance": {

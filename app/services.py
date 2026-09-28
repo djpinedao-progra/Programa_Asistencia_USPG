@@ -64,6 +64,32 @@ class UserService:
             db.session.rollback()
             raise ValueError("Ese carnet ya pertenece a otra cuenta.") from error
 
+    def update_profile(self, user_id, name, email, carnet=""):
+        user = self.users.find_by_id(user_id)
+        name, email, carnet = name.strip(), email.strip().lower(), carnet.strip()
+        if not user or user.role not in {"alumno", "docente"}:
+            raise ValueError("No se encontró el perfil académico.")
+        if not name or "@" not in email:
+            raise ValueError("Indica un nombre y correo institucional válidos.")
+        existing_email = self.users.find_by_email(email)
+        if existing_email and existing_email.id != user.id:
+            raise ValueError("Ese correo ya pertenece a otra cuenta.")
+        if user.role == "alumno" and carnet and not re.fullmatch(r"\d{7}", carnet):
+            raise ValueError("El carnet debe contener exactamente 7 dígitos.")
+        if user.role == "alumno" and carnet:
+            existing_carnet = self.users.find_by_carnet(carnet)
+            if existing_carnet and existing_carnet.id != user.id:
+                raise ValueError("Ese carnet ya pertenece a otra cuenta.")
+        user.name = name
+        user.email = email
+        if user.role == "alumno":
+            user.carnet = carnet or None
+        try:
+            return self.users.save(user)
+        except IntegrityError as error:
+            db.session.rollback()
+            raise ValueError("El correo o carnet ya pertenece a otra cuenta.") from error
+
 
 class CourseService:
     def __init__(self, courses=None):
@@ -117,7 +143,16 @@ class CourseService:
             raise ValueError("No se pudo guardar el curso. Revisa su código.") from error
 
     def update_course_roster(
-        self, course_id, teacher_id, schedule, location_type, classroom, student_ids
+        self,
+        course_id,
+        teacher_id,
+        schedule,
+        location_type,
+        classroom,
+        student_ids,
+        is_active=True,
+        name=None,
+        code=None,
     ):
         course = db.session.get(Course, course_id)
         if not course:
@@ -133,10 +168,22 @@ class CourseService:
         if location_type == "presencial" and not classroom:
             raise ValueError("Indica el salón del curso presencial.")
         students = self._students_from_ids(student_ids)
+        name = (name if name is not None else course.name).strip()
+        code = (code if code is not None else course.code).strip().upper()
+        if not name or not code:
+            raise ValueError("El nombre y el código del curso son obligatorios.")
+        duplicate_code = db.session.scalar(
+            select(Course).where(Course.code == code, Course.id != course.id)
+        )
+        if duplicate_code:
+            raise ValueError("Ese código de curso ya está registrado.")
+        course.name = name
+        course.code = code
         course.teacher_id = teacher.id
         course.schedule = schedule
         course.location_type = location_type
         course.classroom = "Virtual" if location_type == "virtual" else classroom
+        course.is_active = bool(is_active)
         selected_ids = {student.id for student in students}
         existing_ids = {enrollment.student_id for enrollment in course.enrollments}
         for enrollment in list(course.enrollments):
@@ -146,12 +193,18 @@ class CourseService:
             if student.id not in existing_ids:
                 course.enrollments.append(CourseEnrollment(student=student))
         try:
-            closed_sessions = db.session.scalars(
+            course_sessions = db.session.scalars(
                 select(AttendanceSession).where(
-                    AttendanceSession.course_id == course.id,
-                    AttendanceSession.closed_at.is_not(None),
+                    AttendanceSession.course_id == course.id
                 )
             ).all()
+            closed_sessions = []
+            for attendance_session in course_sessions:
+                if not course.is_active and attendance_session.closed_at is None:
+                    attendance_session.active = False
+                    attendance_session.closed_at = datetime.now(timezone.utc)
+                if attendance_session.closed_at is not None:
+                    closed_sessions.append(attendance_session)
             existing_attendance = set(
                 db.session.execute(
                     select(Attendance.student_id, Attendance.session_id)
@@ -175,6 +228,46 @@ class CourseService:
         except IntegrityError as error:
             db.session.rollback()
             raise ValueError("No se pudieron actualizar las asignaciones.") from error
+        return course
+
+    @staticmethod
+    def set_course_active(course_id, is_active):
+        course = db.session.get(Course, course_id)
+        if not course:
+            raise ValueError("No se encontró el curso.")
+        course.is_active = bool(is_active)
+        if not course.is_active:
+            now = datetime.now(timezone.utc)
+            open_sessions = db.session.scalars(
+                select(AttendanceSession).where(
+                    AttendanceSession.course_id == course.id,
+                    AttendanceSession.closed_at.is_(None),
+                )
+            ).all()
+            student_ids = {
+                enrollment.student_id for enrollment in course.enrollments
+            }
+            for attendance_session in open_sessions:
+                existing_ids = set(
+                    db.session.scalars(
+                        select(Attendance.student_id).where(
+                            Attendance.session_id == attendance_session.id
+                        )
+                    ).all()
+                )
+                for student_id in student_ids - existing_ids:
+                    db.session.add(
+                        Attendance(
+                            session_id=attendance_session.id,
+                            student_id=student_id,
+                            recorded_at=now,
+                            status="ausente",
+                            source="cierre",
+                        )
+                    )
+                attendance_session.active = False
+                attendance_session.closed_at = now
+        db.session.commit()
         return course
 
     @staticmethod

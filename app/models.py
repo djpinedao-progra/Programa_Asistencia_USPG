@@ -34,6 +34,7 @@ class Course(db.Model):
     schedule = db.Column(db.String(180), nullable=False, default="")
     location_type = db.Column(db.String(20), nullable=False, default="presencial")
     classroom = db.Column(db.String(100), nullable=False, default="")
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
     teacher = db.relationship("User", backref="courses")
     enrollments = db.relationship(
         "CourseEnrollment", back_populates="course", cascade="all, delete-orphan"

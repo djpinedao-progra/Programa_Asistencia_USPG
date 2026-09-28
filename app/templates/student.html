@@ -76,7 +76,7 @@
 <section class="student-section student-history" id="historial">
   <div class="section-heading"><div><p class="eyebrow">REGISTROS</p><h2>Historial de asistencias</h2></div><span class="section-number">{{ attendances|length }} registros</span></div>
   <div class="table-wrap"><table><thead><tr><th>Curso</th><th>Código</th><th>Estado</th><th>Fecha</th><th>Hora</th></tr></thead><tbody>
-    {% for attendance in attendances %}<tr><td class="primary-cell">{{ attendance.session.course.name }}</td><td>{{ attendance.session.course.code }}</td><td>{{ attendance.status|capitalize }}</td><td>{{ attendance.recorded_at.strftime('%d/%m/%Y') }}</td><td><span class="time-cell">{{ attendance.recorded_at.strftime('%H:%M') }}</span></td></tr>
+    {% for attendance in attendances %}<tr><td class="primary-cell" data-label="Curso">{{ attendance.session.course.name }}</td><td data-label="Código">{{ attendance.session.course.code }}</td><td data-label="Estado">{{ attendance.status|capitalize }}</td><td data-label="Fecha">{{ attendance.recorded_at.strftime('%d/%m/%Y') }}</td><td data-label="Hora"><span class="time-cell">{{ attendance.recorded_at.strftime('%H:%M') }}</span></td></tr>
     {% else %}<tr><td colspan="5" class="empty-cell">Tu historial de asistencia aparecerá aquí.</td></tr>{% endfor %}
   </tbody></table></div>
 </section>

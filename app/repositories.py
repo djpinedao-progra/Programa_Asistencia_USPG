@@ -39,7 +39,9 @@ class UserRepository:
 class CourseRepository:
     def list_for_teacher(self, teacher_id):
         return db.session.scalars(
-            select(Course).where(Course.teacher_id == teacher_id).order_by(Course.name)
+            select(Course)
+            .where(Course.teacher_id == teacher_id, Course.is_active.is_(True))
+            .order_by(Course.name)
         ).all()
 
     def list_all(self):
@@ -48,7 +50,9 @@ class CourseRepository:
     def get_for_teacher(self, course_id, teacher_id):
         return db.session.scalar(
             select(Course).where(
-                Course.id == course_id, Course.teacher_id == teacher_id
+                Course.id == course_id,
+                Course.teacher_id == teacher_id,
+                Course.is_active.is_(True),
             )
         )
 

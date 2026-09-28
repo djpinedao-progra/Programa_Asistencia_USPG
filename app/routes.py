@@ -12,6 +12,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from xml.sax.saxutils import escape
 from flask import (
@@ -130,6 +131,8 @@ def admin_dashboard():
     users = UserRepository().list_all()
     courses = CourseRepository().list_all()
     attendances = AttendanceRepository().list_all()
+    student_summaries = _admin_student_summaries()
+    session_summaries = _admin_session_summaries()[:6]
     return render_template(
         "admin.html",
         users=users,
@@ -137,6 +140,8 @@ def admin_dashboard():
         attendances=attendances,
         teachers=[user for user in users if user.role == "docente"],
         students=[user for user in users if user.role == "alumno"],
+        at_risk_students=sum(row["risk"] != "ninguno" for row in student_summaries),
+        recent_sessions=session_summaries,
     )
 
 
@@ -185,11 +190,478 @@ def admin_update_course(course_id):
             request.form.get("location_type", ""),
             request.form.get("classroom", ""),
             request.form.getlist("student_ids"),
+            request.form.get("is_active") == "on",
+            request.form.get("name", ""),
+            request.form.get("code", ""),
         )
         flash("Asignación del curso actualizada.", "success")
     except (ValueError, TypeError) as error:
         flash(str(error) or "El docente seleccionado no es válido.", "error")
     return redirect(url_for("main.admin_dashboard"))
+
+
+def _admin_student_summaries(course_id=None, session_date=None):
+    students = db.session.scalars(
+        select(User).where(User.role == "alumno").order_by(User.name)
+    ).all()
+    courses = CourseRepository().list_all()
+    course_by_id = {course.id: course for course in courses}
+    enrollments = db.session.scalars(select(CourseEnrollment)).all()
+    course_ids_by_student = {student.id: set() for student in students}
+    for enrollment in enrollments:
+        course_ids_by_student.setdefault(enrollment.student_id, set()).add(
+            enrollment.course_id
+        )
+    historical_records = AttendanceRepository().list_all()
+    for record in historical_records:
+        course_ids_by_student.setdefault(record.student_id, set()).add(
+            record.session.course_id
+        )
+    if course_id:
+        students = [
+            student
+            for student in students
+            if course_id in course_ids_by_student.get(student.id, set())
+        ]
+    relevant_course_ids = {
+        selected_id
+        for student in students
+        for selected_id in course_ids_by_student.get(student.id, set())
+        if selected_id in course_by_id and (not course_id or selected_id == course_id)
+    }
+    sessions = []
+    if relevant_course_ids:
+        sessions = db.session.scalars(
+            select(AttendanceSession)
+            .where(
+                AttendanceSession.course_id.in_(relevant_course_ids),
+                AttendanceSession.closed_at.is_not(None),
+            )
+            .order_by(AttendanceSession.created_at.desc())
+        ).all()
+    if session_date:
+        sessions = [
+            item for item in sessions
+            if item.created_at.date().isoformat() == session_date
+        ]
+    session_ids = {item.id for item in sessions}
+    records = []
+    if session_ids:
+        records = db.session.scalars(
+            select(Attendance).where(Attendance.session_id.in_(session_ids))
+        ).all()
+    record_by_key = {
+        (record.student_id, record.session_id): record for record in records
+    }
+    summaries = []
+    for student in students:
+        student_course_ids = course_ids_by_student.get(student.id, set())
+        if course_id:
+            student_course_ids = student_course_ids & {course_id}
+        student_sessions = [
+            item for item in sessions if item.course_id in student_course_ids
+        ]
+        present = absent = justified = 0
+        for attendance_session in student_sessions:
+            record = record_by_key.get((student.id, attendance_session.id))
+            status = record.status if record else "ausente"
+            present += status == "presente"
+            absent += status == "ausente"
+            justified += status == "justificado"
+        total = len(student_sessions)
+        percentage = round(present / total * 100) if total else 0
+        risk = "alto" if total and percentage < 60 else (
+            "medio" if total and percentage < 80 else "ninguno"
+        )
+        assigned_courses = [
+            course_by_id[item]
+            for item in sorted(student_course_ids)
+            if item in course_by_id
+        ]
+        summaries.append(
+            {
+                "student": student,
+                "courses": assigned_courses,
+                "course_names": ", ".join(course.code for course in assigned_courses),
+                "present": present,
+                "absent": absent,
+                "justified": justified,
+                "total_sessions": total,
+                "percentage": percentage,
+                "risk": risk,
+            }
+        )
+    return summaries
+
+
+def _admin_session_summaries(course_id=None, teacher_id=None, session_date=None):
+    statement = select(AttendanceSession).join(Course)
+    if course_id:
+        statement = statement.where(AttendanceSession.course_id == course_id)
+    if teacher_id:
+        statement = statement.where(Course.teacher_id == teacher_id)
+    sessions = db.session.scalars(
+        statement.order_by(AttendanceSession.created_at.desc())
+    ).all()
+    if session_date:
+        sessions = [
+            item for item in sessions
+            if item.created_at.date().isoformat() == session_date
+        ]
+    summaries = []
+    for attendance_session in sessions:
+        records = attendance_session.attendances
+        assigned_count = len(attendance_session.course.enrollments)
+        if not assigned_count:
+            assigned_count = len({record.student_id for record in records})
+        present_count = sum(record.status == "presente" for record in records)
+        summaries.append(
+            {
+                "session": attendance_session,
+                "course": attendance_session.course,
+                "teacher": attendance_session.course.teacher,
+                "present": present_count,
+                "total": assigned_count,
+            }
+        )
+    return summaries
+
+
+@main.get("/admin/estudiantes")
+@roles_required("admin")
+def admin_students():
+    query = request.args.get("q", "").strip().casefold()
+    course_id = request.args.get("curso", type=int)
+    courses = CourseRepository().list_all()
+    if course_id and not any(course.id == course_id for course in courses):
+        abort(404)
+    students = _admin_student_summaries(course_id=course_id)
+    if query:
+        students = [
+            row for row in students
+            if query in row["student"].name.casefold()
+            or query in row["student"].email.casefold()
+            or query in (row["student"].carnet or "").casefold()
+        ]
+    return render_template(
+        "admin_students.html", students=students, courses=courses,
+        query=query, selected_course=course_id,
+    )
+
+
+@main.get("/admin/docentes")
+@roles_required("admin")
+def admin_teachers():
+    query = request.args.get("q", "").strip().casefold()
+    teachers = db.session.scalars(
+        select(User).where(User.role == "docente").order_by(User.name)
+    ).all()
+    if query:
+        teachers = [
+            teacher for teacher in teachers
+            if query in teacher.name.casefold() or query in teacher.email.casefold()
+        ]
+    return render_template("admin_teachers.html", teachers=teachers, query=query)
+
+
+@main.route("/admin/usuarios/<int:user_id>/perfil", methods=["GET", "POST"])
+@roles_required("admin")
+def admin_user_profile(user_id):
+    user = db.session.get(User, user_id)
+    if not user or user.role not in {"alumno", "docente"}:
+        abort(404)
+    if request.method == "POST":
+        try:
+            UserService().update_profile(
+                user.id,
+                request.form.get("name", ""),
+                request.form.get("email", ""),
+                request.form.get("carnet", ""),
+            )
+            flash("Perfil actualizado.", "success")
+            return redirect(url_for("main.admin_user_profile", user_id=user.id))
+        except ValueError as error:
+            flash(str(error), "error")
+    profile_courses = (
+        user.courses if user.role == "docente"
+        else [enrollment.course for enrollment in user.course_enrollments]
+    )
+    return render_template(
+        "admin_profile.html", user=user, profile_courses=profile_courses
+    )
+
+
+@main.post("/admin/cursos/<int:course_id>/estado")
+@roles_required("admin")
+def admin_toggle_course(course_id):
+    course = db.session.get(Course, course_id)
+    if not course:
+        abort(404)
+    try:
+        CourseService.set_course_active(course_id, request.form.get("is_active") == "on")
+        flash(
+            "Curso habilitado para el docente." if course.is_active
+            else "Curso deshabilitado; las sesiones abiertas se cerraron.",
+            "success",
+        )
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("main.admin_teachers"))
+
+
+@main.get("/admin/cursos")
+@roles_required("admin")
+def admin_courses():
+    query = request.args.get("q", "").strip().casefold()
+    teacher_id = request.args.get("docente", type=int)
+    courses = CourseRepository().list_all()
+    if query:
+        courses = [
+            course for course in courses
+            if query in course.name.casefold() or query in course.code.casefold()
+        ]
+    if teacher_id:
+        courses = [course for course in courses if course.teacher_id == teacher_id]
+    teachers = db.session.scalars(
+        select(User).where(User.role == "docente").order_by(User.name)
+    ).all()
+    students = db.session.scalars(
+        select(User).where(User.role == "alumno").order_by(User.name)
+    ).all()
+    return render_template(
+        "admin_courses.html", courses=courses, teachers=teachers,
+        students=students, query=query, selected_teacher=teacher_id,
+    )
+
+
+@main.get("/admin/asistencias")
+@roles_required("admin")
+def admin_attendance_overview():
+    course_id = request.args.get("curso", type=int)
+    session_date = request.args.get("fecha", "")
+    query = request.args.get("estudiante", "").strip().casefold()
+    risk_filter = request.args.get("riesgo", "")
+    courses = CourseRepository().list_all()
+    if course_id and not any(course.id == course_id for course in courses):
+        abort(404)
+    students = _admin_student_summaries(course_id, session_date or None)
+    if query:
+        students = [
+            row for row in students
+            if query in row["student"].name.casefold()
+            or query in (row["student"].carnet or "").casefold()
+        ]
+    if risk_filter in {"alto", "medio", "ninguno"}:
+        students = [row for row in students if row["risk"] == risk_filter]
+    return render_template(
+        "admin_attendance.html", students=students, courses=courses,
+        selected_course=course_id, session_date=session_date,
+        query=query, risk_filter=risk_filter,
+    )
+
+
+@main.get("/admin/reportes")
+@roles_required("admin")
+def admin_reports():
+    course_id = request.args.get("curso", type=int)
+    courses = CourseRepository().list_all()
+    if course_id and not any(course.id == course_id for course in courses):
+        abort(404)
+    summaries = _admin_student_summaries(course_id=course_id)
+    return render_template(
+        "admin_reports.html", courses=courses, summaries=summaries,
+        selected_course=course_id,
+    )
+
+
+@main.get("/admin/historial")
+@roles_required("admin")
+def admin_history():
+    course_id = request.args.get("curso", type=int)
+    teacher_id = request.args.get("docente", type=int)
+    session_date = request.args.get("fecha", "")
+    courses = CourseRepository().list_all()
+    teachers = db.session.scalars(
+        select(User).where(User.role == "docente").order_by(User.name)
+    ).all()
+    sessions = _admin_session_summaries(course_id, teacher_id, session_date or None)
+    return render_template(
+        "admin_history.html", sessions=sessions, courses=courses,
+        teachers=teachers, selected_course=course_id,
+        selected_teacher=teacher_id, session_date=session_date,
+    )
+
+
+def _admin_report_pdf(summaries, title, subtitle):
+    output = io.BytesIO()
+    document = SimpleDocTemplate(
+        output,
+        pagesize=landscape(letter),
+        rightMargin=14 * mm,
+        leftMargin=14 * mm,
+        topMargin=14 * mm,
+        bottomMargin=14 * mm,
+        title=title,
+    )
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph(escape(title), styles["Title"]),
+        Paragraph(escape(subtitle), styles["BodyText"]),
+        Spacer(1, 9 * mm),
+    ]
+    chart_rows = summaries[:14]
+    if chart_rows:
+        chart_height = max(70, len(chart_rows) * 18 + 10)
+        chart = Drawing(520, chart_height)
+        for index, row in enumerate(chart_rows):
+            y = chart_height - 20 - index * 18
+            pct = row["percentage"]
+            color = colors.HexColor(
+                "#b5122b" if row["risk"] == "alto"
+                else "#c58a24" if row["risk"] == "medio"
+                else "#47745d"
+            )
+            chart.add(
+                String(0, y + 2, row["student"].name[:25], fontSize=8)
+            )
+            chart.add(
+                Rect(150, y, max(1, pct * 2.8), 10, fillColor=color, strokeColor=None)
+            )
+            chart.add(String(455, y + 2, f"{pct}%", fontSize=8))
+        story.extend([chart, Spacer(1, 5 * mm)])
+    data = [["Estudiante", "Carnet", "Cursos", "Sesiones", "Presentes", "Faltas", "Justificadas", "%", "Riesgo"]]
+    for row in summaries:
+        data.append(
+            [
+                Paragraph(escape(row["student"].name), styles["BodyText"]),
+                row["student"].carnet or "—",
+                Paragraph(escape(row["course_names"] or "—"), styles["BodyText"]),
+                str(row["total_sessions"]),
+                str(row["present"]),
+                str(row["absent"]),
+                str(row["justified"]),
+                f"{row['percentage']}%",
+                row["risk"].capitalize(),
+            ]
+        )
+    table = Table(data, repeatRows=1, colWidths=[37 * mm, 22 * mm, 52 * mm, 17 * mm, 17 * mm, 15 * mm, 21 * mm, 12 * mm, 19 * mm])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#292324")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ("LEADING", (0, 0), (-1, -1), 9),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d8cfd0")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f2f3")]),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    story.append(table)
+    document.build(story)
+    output.seek(0)
+    return output
+
+
+@main.get("/admin/reportes.pdf")
+@roles_required("admin")
+def admin_reports_pdf():
+    course_id = request.args.get("curso", type=int)
+    courses = CourseRepository().list_all()
+    course = next((item for item in courses if item.id == course_id), None)
+    if course_id and not course:
+        abort(404)
+    summaries = _admin_student_summaries(course_id=course_id)
+    title = "Reporte de asistencia" if not course else f"Reporte {course.name}"
+    subtitle = "Todos los cursos" if not course else f"Curso {course.code} · {course.schedule or 'Horario pendiente'}"
+    output = _admin_report_pdf(summaries, title, subtitle)
+    filename = f"reporte-asistencia-{course.code if course else 'general'}.pdf"
+    return send_file(output, mimetype="application/pdf", as_attachment=True, download_name=filename)
+
+
+@main.get("/admin/sesiones/<int:session_id>/reporte.pdf")
+@roles_required("admin")
+def admin_session_report_pdf(session_id):
+    attendance_session = db.session.get(AttendanceSession, session_id)
+    if not attendance_session:
+        abort(404)
+    records = {
+        record.student_id: record
+        for record in db.session.scalars(
+            select(Attendance).where(Attendance.session_id == session_id)
+        ).all()
+    }
+    students = [enrollment.student for enrollment in attendance_session.course.enrollments]
+    if not students:
+        students = list(
+            {
+                record.student_id: record.student
+                for record in db.session.scalars(
+                    select(Attendance).where(Attendance.session_id == session_id)
+                ).all()
+            }.values()
+        )
+    data = [["Estudiante", "Carnet", "Estado", "Fecha", "Hora", "Origen"]]
+    for student in sorted(students, key=lambda item: item.name.casefold()):
+        record = records.get(student.id)
+        recorded_at = record.recorded_at if record else None
+        data.append(
+            [
+                Paragraph(escape(student.name), getSampleStyleSheet()["BodyText"]),
+                student.carnet or "—",
+                record.status.capitalize() if record else "Pendiente",
+                recorded_at.strftime("%d/%m/%Y") if recorded_at else "—",
+                recorded_at.strftime("%H:%M") if recorded_at else "—",
+                {"qr": "Código QR", "manual": "Docente", "cierre": "Cierre"}.get(
+                    record.source if record else "", "—"
+                ),
+            ]
+        )
+    output = io.BytesIO()
+    document = SimpleDocTemplate(
+        output, pagesize=landscape(letter), title="Reporte de sesión"
+    )
+    styles = getSampleStyleSheet()
+    course = attendance_session.course
+    story = [
+        Paragraph(escape(f"Reporte de sesión · {course.name}"), styles["Title"]),
+        Paragraph(
+            escape(
+                f"{course.code} · Docente: {course.teacher.name} · "
+                f"Horario: {course.schedule or '—'} · "
+                f"Sesión: {attendance_session.created_at.strftime('%d/%m/%Y %H:%M')}"
+            ),
+            styles["BodyText"],
+        ),
+        Spacer(1, 8 * mm),
+    ]
+    table = Table(data, repeatRows=1, colWidths=[65 * mm, 30 * mm, 35 * mm, 35 * mm, 30 * mm, 45 * mm])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#292324")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d8cfd0")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f2f3")]),
+            ]
+        )
+    )
+    story.append(table)
+    document.build(story)
+    output.seek(0)
+    return send_file(
+        output,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"sesion-{course.code}-{attendance_session.id}.pdf",
+    )
 
 
 def _teacher_course_metrics(course):

@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app import db
 from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, User
+from app.repositories import CourseRepository
 
 
 def create_user(name, email, role, carnet=None):
@@ -227,10 +228,17 @@ def test_admin_can_see_teacher_student_data_and_attendance(app):
     login(client, "admin@uspg.edu")
     response = client.get("/admin")
     assert response.status_code == 200
-    assert b"2600403" in response.data
-    assert b"docente@uspg.edu" in response.data
-    assert b"INF-101" in response.data
-    assert b"Alumno anterior" in response.data
+    assert b"Resumen acad\xc3\xa9mico" in response.data
+    students_page = client.get("/admin/estudiantes")
+    teachers_page = client.get("/admin/docentes")
+    courses_page = client.get("/admin/cursos")
+    assert students_page.status_code == 200
+    assert teachers_page.status_code == 200
+    assert courses_page.status_code == 200
+    assert b"2600403" in students_page.data
+    assert b"Alumno anterior" in students_page.data
+    assert b"docente@uspg.edu" in teachers_page.data
+    assert b"INF-101" in courses_page.data
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', response.data
     ).group(1).decode()
@@ -429,3 +437,151 @@ def test_teacher_session_renewal_close_history_and_notices(app):
     login(alice_client, "2600401")
     student_page = alice_client.get("/alumno")
     assert "La clase empieza 20 minutos después.".encode() in student_page.data
+
+
+def test_admin_filters_profiles_and_course_availability(app):
+    with app.app_context():
+        create_user("Admin", "admin@uspg.edu", "admin")
+        teacher = create_user("Docente Uno", "docente@uspg.edu", "docente")
+        student = create_user("Estudiante Uno", "alumno@uspg.edu", "alumno", "2600401")
+        course = Course(
+            name="Química", code="QUI-101", teacher_id=teacher.id,
+            schedule="Jueves 09:00", classroom="Lab 2",
+        )
+        db.session.add(course)
+        db.session.flush()
+        db.session.add(CourseEnrollment(course_id=course.id, student_id=student.id))
+        db.session.commit()
+        student_id, teacher_id, course_id = student.id, teacher.id, course.id
+
+    client = app.test_client()
+    login(client, "admin@uspg.edu")
+    students_page = client.get(f"/admin/estudiantes?q=2600401&curso={course_id}")
+    assert students_page.status_code == 200
+    assert b"Estudiante Uno" in students_page.data
+    assert b"QUI-101" in students_page.data
+    profile_page = client.get(f"/admin/usuarios/{student_id}/perfil")
+    csrf_token = re.search(
+        rb'name="csrf_token" value="([^"]+)"', profile_page.data
+    ).group(1).decode()
+    update = client.post(
+        f"/admin/usuarios/{student_id}/perfil",
+        data={
+            "csrf_token": csrf_token,
+            "name": "Estudiante Actualizado",
+            "email": "actualizado@uspg.edu",
+            "carnet": "2600402",
+        },
+    )
+    assert update.status_code == 302
+    with app.app_context():
+        student = db.session.get(User, student_id)
+        assert student.name == "Estudiante Actualizado"
+        assert student.email == "actualizado@uspg.edu"
+        assert student.carnet == "2600402"
+
+    teacher_page = client.get("/admin/docentes?q=docente%40uspg.edu")
+    assert b"Docente Uno" in teacher_page.data
+    course_page = client.get(f"/admin/cursos?docente={teacher_id}")
+    assert b"QUI-101" in course_page.data
+    toggle_csrf = re.search(
+        rb'name="csrf_token" value="([^"]+)"', course_page.data
+    ).group(1).decode()
+    course_update = client.post(
+        f"/admin/cursos/{course_id}/asignaciones",
+        data={
+            "csrf_token": toggle_csrf,
+            "name": "Química orgánica",
+            "code": "QUI-102",
+            "teacher_id": str(teacher_id),
+            "schedule": "Jueves 10:00",
+            "location_type": "presencial",
+            "classroom": "Lab 3",
+            "student_ids": [str(student_id)],
+            "is_active": "on",
+        },
+    )
+    assert course_update.status_code == 302
+    with app.app_context():
+        updated_course = db.session.get(Course, course_id)
+        assert updated_course.name == "Química orgánica"
+        assert updated_course.code == "QUI-102"
+        assert updated_course.schedule == "Jueves 10:00"
+    disabled = client.post(
+        f"/admin/cursos/{course_id}/estado", data={"csrf_token": toggle_csrf}
+    )
+    assert disabled.status_code == 302
+    with app.app_context():
+        assert db.session.get(Course, course_id).is_active is False
+        assert CourseRepository().list_for_teacher(teacher_id) == []
+    reenabled = client.post(
+        f"/admin/cursos/{course_id}/estado",
+        data={"csrf_token": toggle_csrf, "is_active": "on"},
+    )
+    assert reenabled.status_code == 302
+    with app.app_context():
+        assert len(CourseRepository().list_for_teacher(teacher_id)) == 1
+
+
+def test_admin_attendance_reports_and_session_pdf(app):
+    with app.app_context():
+        create_user("Admin", "admin@uspg.edu", "admin")
+        teacher = create_user("Docente", "docente@uspg.edu", "docente")
+        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        course = Course(
+            name="Literatura", code="LIT-101", teacher_id=teacher.id,
+            schedule="Viernes 11:00", classroom="Aula 7",
+        )
+        db.session.add(course)
+        db.session.flush()
+        db.session.add(CourseEnrollment(course_id=course.id, student_id=student.id))
+        db.session.flush()
+        now = datetime.now(timezone.utc)
+        attendance_session = AttendanceSession(
+            course_id=course.id,
+            token_hash="b" * 64,
+            created_at=now,
+            expires_at=now,
+            active=False,
+            closed_at=now,
+        )
+        db.session.add(attendance_session)
+        db.session.flush()
+        db.session.add(
+            Attendance(
+                session_id=attendance_session.id,
+                student_id=student.id,
+                recorded_at=now,
+                status="presente",
+                source="qr",
+            )
+        )
+        db.session.commit()
+        course_id, teacher_id = course.id, teacher.id
+        session_id = attendance_session.id
+        session_date = now.date().isoformat()
+
+    client = app.test_client()
+    login(client, "admin@uspg.edu")
+    filtered_attendance = client.get(
+        f"/admin/asistencias?curso={course_id}&fecha={session_date}&estudiante=2600403&riesgo=ninguno"
+    )
+    assert filtered_attendance.status_code == 200
+    assert b"Alumna" in filtered_attendance.data
+    assert b"100%" in filtered_attendance.data
+    report_page = client.get(f"/admin/reportes?curso={course_id}")
+    assert report_page.status_code == 200
+    assert b"LIT-101" in report_page.data
+    report_pdf = client.get(f"/admin/reportes.pdf?curso={course_id}")
+    assert report_pdf.status_code == 200
+    assert report_pdf.mimetype == "application/pdf"
+    assert report_pdf.data.startswith(b"%PDF")
+    history = client.get(
+        f"/admin/historial?curso={course_id}&docente={teacher_id}&fecha={session_date}"
+    )
+    assert history.status_code == 200
+    assert b"1/1" in history.data
+    session_pdf = client.get(f"/admin/sesiones/{session_id}/reporte.pdf")
+    assert session_pdf.status_code == 200
+    assert session_pdf.mimetype == "application/pdf"
+    assert session_pdf.data.startswith(b"%PDF")

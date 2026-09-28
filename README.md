@@ -54,6 +54,8 @@ Para que un teléfono alcance al servidor, ambos dispositivos deben estar en la 
 - `app/services.py` implementa reglas de cuentas, cursos y asistencia.
 - `app/routes.py` conecta los casos de uso con la interfaz web.
 - El administrador puede revisar cuentas, carnets, cursos de cada docente y el historial global de asistencia.
+- El panel administrador incluye apartados separados para estudiantes, docentes, cursos, asistencias, reportes e historial; permite editar perfiles, habilitar cursos y filtrar registros.
+- Los reportes administrativos muestran porcentajes y niveles de riesgo, con exportación PDF global, por curso o por sesión.
 - Los docentes y administradores pueden descargar los registros por curso en CSV o PDF.
 - Los QR contienen tokens aleatorios cuya huella se guarda en la base de datos; vencen a los 5 minutos, pueden renovarse desde la sesión y la restricción única impide duplicados.
 - Al cerrar una sesión, los estudiantes asignados sin registro quedan como ausentes. Cada registro conserva estado (presente, ausente o justificado), hora y origen (QR o docente).
