@@ -38,4 +38,32 @@
     </tbody></table></div>
   </section>
 </div>
+<section class="admin-course-control">
+  <div class="section-heading"><div><p class="eyebrow">PLANIFICACIÓN ACADÉMICA</p><h2>Crear curso y asignar estudiantes</h2></div><span class="section-number">{{ courses|length }} cursos</span></div>
+  <form method="post" action="{{ url_for('main.admin_create_course') }}" class="admin-course-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Nombre del curso<input name="name" required placeholder="Ej. Biología celular"></label>
+    <label>Código<input name="code" required placeholder="BIO-101"></label>
+    <label>Docente<select name="teacher_id" required><option value="">Selecciona docente</option>{% for teacher in teachers %}<option value="{{ teacher.id }}">{{ teacher.name }}</option>{% endfor %}</select></label>
+    <label>Horario<input name="schedule" required placeholder="Lunes y miércoles, 08:00–09:30"></label>
+    <label>Modalidad<select name="location_type" data-location-mode required><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></label>
+    <label>Salón o plataforma<input name="classroom" data-classroom required placeholder="Aula 204"></label>
+    <fieldset class="student-picker"><legend>Estudiantes asignados</legend>{% for student in students %}<label><input type="checkbox" name="student_ids" value="{{ student.id }}">{{ student.name }} · {{ student.carnet or 'Sin carnet' }}</label>{% else %}<p>No hay estudiantes registrados.</p>{% endfor %}</fieldset>
+    <button class="button button-primary" type="submit">Crear curso</button>
+  </form>
+  <div class="admin-course-list"><div class="section-heading"><div><p class="eyebrow">CURSOS EXISTENTES</p><h3>Asignaciones y horarios</h3></div></div>
+    {% for course in courses %}{% set enrolled_ids = course.enrollments|map(attribute='student_id')|list %}
+    <details class="admin-course-item"><summary><strong>{{ course.name }} · {{ course.code }}</strong><span>{{ course.enrollments|length }} estudiantes</span></summary>
+      <form method="post" action="{{ url_for('main.admin_update_course', course_id=course.id) }}" class="admin-course-form admin-course-edit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Docente<select name="teacher_id" required>{% for teacher in teachers %}<option value="{{ teacher.id }}" {% if teacher.id == course.teacher_id %}selected{% endif %}>{{ teacher.name }}</option>{% endfor %}</select></label>
+        <label>Horario<input name="schedule" value="{{ course.schedule }}" required placeholder="Lunes, 08:00–09:30"></label>
+        <label>Modalidad<select name="location_type" required><option value="presencial" {% if course.location_type == 'presencial' %}selected{% endif %}>Presencial</option><option value="virtual" {% if course.location_type == 'virtual' %}selected{% endif %}>Virtual</option></select></label>
+        <label>Salón o plataforma<input name="classroom" value="{{ course.classroom }}" required placeholder="Aula 204"></label>
+        <fieldset class="student-picker"><legend>Estudiantes asignados</legend>{% for student in students %}<label><input type="checkbox" name="student_ids" value="{{ student.id }}" {% if student.id in enrolled_ids %}checked{% endif %}>{{ student.name }} · {{ student.carnet or 'Sin carnet' }}</label>{% else %}<p>No hay estudiantes registrados.</p>{% endfor %}</fieldset>
+        <button class="button button-outline" type="submit">Guardar asignaciones</button>
+      </form>
+    </details>{% endfor %}
+  </div>
+</section>
 {% endblock %}

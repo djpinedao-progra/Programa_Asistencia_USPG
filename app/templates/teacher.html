@@ -1,27 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Panel docente{% endblock %}
+{% block title %}Inicio docente{% endblock %}
 {% block content %}
-<div class="page-heading">
-  <div><p class="eyebrow">ESPACIO DOCENTE</p><h1>Tus cursos</h1><p class="muted">Abre una sesión y comparte el QR con tu clase.</p></div>
-  <span class="heading-count">{{ courses|length }} <small>cursos</small></span>
-</div>
-<div class="teacher-grid">
-  <section class="data-section">
-    <div class="section-heading"><div><p class="eyebrow">CURSOS ASIGNADOS</p><h2>Lista de cursos</h2></div><span class="section-number">{{ courses|length }}</span></div>
-    <div class="course-list course-list-large">
-      {% for course in courses %}<div class="course-row"><div class="course-symbol">{{ course.code[:1] }}</div><div class="course-info"><strong>{{ course.name }}</strong><span>{{ course.code }}</span></div><form method="post" action="{{ url_for('main.create_attendance_session', course_id=course.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button button-small" type="submit">Abrir asistencia <span aria-hidden="true">↗</span></button></form></div>
-      {% else %}<div class="empty-state"><span class="empty-icon">＋</span><strong>Sin cursos por ahora</strong><p>Crea un curso para comenzar a tomar asistencia.</p></div>{% endfor %}
-    </div>
-  </section>
-  <section class="panel form-panel">
-    <div class="section-heading"><div><p class="eyebrow">CONFIGURACIÓN</p><h2>Crear curso</h2></div><span class="section-number">＋</span></div>
-    <form method="post" class="stack-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label for="course-name">Nombre del curso</label><input id="course-name" name="name" placeholder="Ej. Introducción a la programación" required>
-      <label for="course-code">Código</label><input id="course-code" name="code" placeholder="INF-101" required>
-      <button class="button button-outline" type="submit">Guardar curso <span aria-hidden="true">+</span></button>
-    </form>
-    <div class="note-block"><span class="note-icon">i</span><p>Cada código de curso debe ser único dentro de la universidad.</p></div>
-  </section>
-</div>
+<nav class="teacher-nav" aria-label="Apartados docentes"><a href="#inicio">Inicio</a><a href="#mis-cursos">Mis cursos</a><a href="#tomar-asistencia">Tomar asistencia</a><a href="{{ url_for('main.teacher_history') }}">Historial</a><a href="{{ url_for('main.teacher_students') }}">Estudiantes</a><a href="#avisos">Avisos</a></nav>
+<section class="teacher-home" id="inicio">
+  <div class="teacher-welcome"><p class="eyebrow">ESPACIO DOCENTE</p><h1>Hola, {{ current_user.name.split()[0] }}</h1><p>Resumen de tus cursos y actividad académica.</p><a class="button button-light" href="#tomar-asistencia">Tomar asistencia <span aria-hidden="true">→</span></a></div>
+  <div class="teacher-overview"><div><span>Cursos a cargo</span><strong>{{ courses|length }}</strong></div><div><span>Estudiantes asignados</span><strong>{{ total_enrollments }}</strong></div><div><span>Sesiones realizadas</span><strong>{{ total_sessions }}</strong></div><div><span>Estudiantes bajo 80%</span><strong>{{ students_below_80 }}</strong></div></div>
+</section>
+
+<section class="teacher-section" id="mis-cursos">
+  <div class="section-heading"><div><p class="eyebrow">PLANIFICACIÓN</p><h2>Mis cursos</h2></div><span class="section-number">{{ courses|length }} asignados</span></div>
+  <div class="teacher-course-grid">
+  {% for item in course_metrics %}{% set course = item.course %}
+    <article class="teacher-course-card"><div class="teacher-course-title"><div><p class="eyebrow">{{ course.code }}</p><h3>{{ course.name }}</h3></div><strong>{{ item.average_percentage }}%</strong></div>
+      <div class="teacher-course-facts"><span><b>{{ item.student_count }}</b> estudiantes</span><span><b>{{ item.sessions_count }}</b> sesiones</span><span><b>{{ item.below_80 }}</b> bajo 80%</span></div>
+      <div class="teacher-course-meta"><span><b>Horario</b>{{ course.schedule or 'Pendiente de asignar' }}</span><span><b>Modalidad</b>{{ 'Virtual' if course.location_type == 'virtual' else 'Presencial' }} · {{ course.classroom or 'Salón pendiente' }}</span></div>
+      <a class="button button-outline button-small" href="{{ url_for('main.teacher_course', course_id=course.id) }}">Ver Curso <span aria-hidden="true">→</span></a>
+    </article>
+  {% else %}<div class="empty-student teacher-empty"><strong>Aún no tienes cursos asignados</strong><p>El administrador asignará tus cursos y estudiantes.</p></div>{% endfor %}
+  </div>
+</section>
+
+<section class="teacher-section" id="tomar-asistencia">
+  <div class="section-heading"><div><p class="eyebrow">CONTROL DE CLASE</p><h2>Tomar asistencia</h2></div></div>
+  <form method="post" action="{{ url_for('main.start_attendance_from_dashboard') }}" class="start-attendance-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label for="attendance-course">Curso</label><select id="attendance-course" name="course_id" required><option value="">Selecciona un curso</option>{% for course in courses %}<option value="{{ course.id }}">{{ course.name }} · {{ course.code }}</option>{% endfor %}</select><button class="button button-primary" type="submit" {% if not courses %}disabled{% endif %}>Iniciar asistencia <span aria-hidden="true">↗</span></button></form>
+</section>
+
+<section class="teacher-section" id="avisos">
+  <div class="section-heading"><div><p class="eyebrow">COMUNICACIÓN</p><h2>Avisos</h2></div><span class="section-number">{{ notice_history|length }} recientes</span></div>
+  <div class="notice-compose-grid"><form method="post" action="{{ url_for('main.send_teacher_notice') }}" class="notice-compose"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><h3>Enviar aviso</h3><label>Curso<select name="course_id" data-notice-course required><option value="">Selecciona curso</option>{% for course in courses %}<option value="{{ course.id }}">{{ course.name }}</option>{% endfor %}</select></label><label>Destinatario<select name="student_id" data-notice-student><option value="">Todo el curso</option>{% for item in course_metrics %}{% for row in item.students %}<option value="{{ row.student.id }}" data-course-id="{{ item.course.id }}">{{ row.student.name }} · {{ item.course.code }}</option>{% endfor %}{% endfor %}</select></label><label>Mensaje<textarea name="message" maxlength="500" required placeholder="Escribe el aviso"></textarea></label><button class="button button-primary" type="submit" {% if not courses %}disabled{% endif %}>Enviar aviso</button></form>
+    <div class="notice-history"><h3>Enviados recientemente</h3>{% for notice in notice_history %}<article><span class="notice-kind">{{ {'automatic': 'Asistencia baja', 'broadcast': 'Curso completo', 'manual': 'Personal'}[notice.kind] }}</span><strong>{{ notice.course.code }}{% if notice.student %} · {{ notice.student.name }}{% else %} · Todo el curso{% endif %}</strong><p>{{ notice.message }}</p><time>{{ notice.created_at.strftime('%d/%m/%Y · %H:%M') }}</time></article>{% else %}<p class="muted">Todavía no has enviado avisos.</p>{% endfor %}</div>
+  </div>
+  <div class="automatic-alerts"><h3>Observación automática · menos de 90%</h3>
+    {% for item in course_metrics %}{% for row in item.students if row.percentage < 90 %}<article class="automatic-alert {% if row.percentage < 80 %}automatic-alert-risk{% endif %}"><span>{{ row.percentage }}%</span><div><strong>{{ row.student.name }} · {{ item.course.code }}</strong><p>{{ row.absent }} faltas · El mínimo requerido para examen final es 80%.</p></div></article>{% endfor %}{% endfor %}
+    {% if students_below_80 == 0 and courses|length == 0 %}<p class="muted">No hay cursos asignados.</p>{% endif %}
+  </div>
+</section>
 {% endblock %}

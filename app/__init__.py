@@ -23,7 +23,7 @@ def create_app(test_config=None):
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
-        QR_SESSION_MINUTES=15,
+        QR_SESSION_MINUTES=5,
         APP_BASE_URL=os.getenv("APP_BASE_URL", "").rstrip("/"),
     )
     if test_config:
@@ -81,6 +81,48 @@ def create_app(test_config=None):
                     text("CREATE UNIQUE INDEX ix_users_carnet ON users (carnet)")
                 )
         click.echo("Columna carnet lista. Los alumnos existentes pueden completar su carnet con el administrador.")
+
+    @app.cli.command("migrate-teacher-tools")
+    def migrate_teacher_tools_command():
+        """Add course, attendance, enrollment, and notice fields for teacher tools."""
+        additions = {
+            "courses": {
+                "schedule": "VARCHAR(180) NOT NULL DEFAULT ''",
+                "location_type": "VARCHAR(20) NOT NULL DEFAULT 'presencial'",
+                "classroom": "VARCHAR(100) NOT NULL DEFAULT ''",
+            },
+            "attendance_sessions": {"closed_at": "DATETIME"},
+            "attendance": {
+                "status": "VARCHAR(20) NOT NULL DEFAULT 'presente'",
+                "source": "VARCHAR(20) NOT NULL DEFAULT 'qr'",
+                "modified_by_id": "INTEGER",
+            },
+        }
+        inspector = inspect(db.engine)
+        for table_name, columns in additions.items():
+            existing_columns = {
+                column["name"] for column in inspector.get_columns(table_name)
+            }
+            for column_name, column_definition in columns.items():
+                if column_name not in existing_columns:
+                    with db.engine.begin() as connection:
+                        connection.execute(
+                            text(
+                                f"ALTER TABLE {table_name} ADD COLUMN "
+                                f"{column_name} {column_definition}"
+                            )
+                        )
+        db.create_all()
+        with db.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE attendance_sessions "
+                    "SET active = 0, closed_at = expires_at "
+                    "WHERE closed_at IS NULL AND expires_at < :now"
+                ),
+                {"now": datetime.now(timezone.utc).replace(tzinfo=None)},
+            )
+        click.echo("Herramientas docentes listas; los datos existentes se conservaron.")
 
     @app.cli.command("seed-admin")
     def seed_admin_command():

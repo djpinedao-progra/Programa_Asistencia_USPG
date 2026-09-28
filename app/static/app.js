@@ -32,6 +32,92 @@
     updatePasswordFeedback();
   }
 
+  const liveSession = document.querySelector("[data-live-session]");
+  if (liveSession) {
+    const roster = liveSession.querySelector("[data-attendance-list]");
+    const search = liveSession.querySelector("[data-student-search]");
+    const countdown = liveSession.querySelector("[data-qr-countdown]");
+    const formatTimestamp = (value) => {
+      if (!value) return "Sin registro";
+      const date = new Date(value);
+      return `${date.toLocaleDateString("es-GT")} · ${date.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
+    };
+    const updateRoster = async () => {
+      try {
+        const response = await fetch(liveSession.dataset.statusUrl, {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) return;
+        const state = await response.json();
+        state.students.forEach((student) => {
+          const row = roster.querySelector(`[data-student-id="${student.id}"]`);
+          if (!row) return;
+          const status = row.querySelector("[data-student-status]");
+          status.textContent = student.status.charAt(0).toUpperCase() + student.status.slice(1);
+          status.className = `session-state state-${student.status}`;
+          row.querySelector("[data-student-time]").textContent = student.recorded_at
+            ? `${formatTimestamp(student.recorded_at)} · ${{ qr: "QR", manual: "Manual", cierre: "Cierre" }[student.source] || ""}`
+            : "Sin registro";
+          const select = row.querySelector("select[name=status]");
+          if (select && document.activeElement !== select && student.status !== "pendiente") {
+            select.value = student.status;
+          }
+        });
+        const count = liveSession.querySelector("[data-present-count]");
+        if (count) count.textContent = state.present_count;
+      } catch (_) {
+        // The roster refresh is best-effort while the teacher keeps the page open.
+      }
+    };
+    search?.addEventListener("input", () => {
+      const query = search.value.trim().toLocaleLowerCase();
+      roster.querySelectorAll("[data-student-id]").forEach((row) => {
+        row.hidden = !`${row.dataset.studentName} ${row.dataset.studentCarnet}`
+          .toLocaleLowerCase()
+          .includes(query);
+      });
+    });
+    liveSession.querySelector("[data-confirm-close]")?.addEventListener("submit", (event) => {
+      if (!window.confirm("¿Cerrar la asistencia? Los estudiantes sin registro quedarán como ausentes.")) {
+        event.preventDefault();
+      }
+    });
+    if (countdown && liveSession.dataset.closed !== "true") {
+      const expiresAt = Number(liveSession.dataset.expires) * 1000;
+      const updateCountdown = () => {
+        const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+        countdown.textContent = `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
+        if (remaining === 0) {
+          const qrFrame = liveSession.querySelector(".qr-frame");
+          if (qrFrame) qrFrame.hidden = true;
+          countdown.textContent = "VENCIDO · genera otro QR";
+        }
+      };
+      updateCountdown();
+      window.setInterval(updateCountdown, 1000);
+    }
+    if (liveSession.dataset.closed !== "true") {
+      updateRoster();
+      window.setInterval(updateRoster, 5000);
+    }
+  }
+
+  const noticeCourse = document.querySelector("[data-notice-course]");
+  const noticeStudent = document.querySelector("[data-notice-student]");
+  if (noticeCourse && noticeStudent) {
+    const filterNoticeStudents = () => {
+      const courseId = noticeCourse.value;
+      [...noticeStudent.options].forEach((option) => {
+        if (!option.value) return;
+        option.hidden = Boolean(courseId && option.dataset.courseId !== courseId);
+      });
+      const selectedOption = noticeStudent.selectedOptions[0];
+      if (selectedOption?.hidden) noticeStudent.value = "";
+    };
+    noticeCourse.addEventListener("change", filterNoticeStudents);
+    filterNoticeStudents();
+  }
+
   const panel = document.querySelector("[data-scanner]");
   if (!panel) return;
 

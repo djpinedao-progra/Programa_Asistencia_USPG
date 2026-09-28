@@ -33,7 +33,7 @@ Aplicación web en Python para gestionar la asistencia universitaria con cuentas
 	flask --app run.py seed-admin
 	```
 
-   Si actualizas una instalación anterior, ejecuta también `flask --app run.py migrate-carnet`. El carnet se solicita para los alumnos nuevos y las cuentas existentes pueden no tenerlo hasta completar la migración institucional.
+	Si actualizas una instalación anterior, ejecuta `flask --app run.py migrate-carnet` y `flask --app run.py migrate-teacher-tools`. Estas migraciones agregan campos y tablas sin eliminar los cursos o asistencias guardados. El carnet se solicita para los alumnos nuevos y las cuentas existentes pueden no tenerlo hasta completar la migración institucional.
 
 5. Inicia la aplicación:
 
@@ -41,7 +41,7 @@ Aplicación web en Python para gestionar la asistencia universitaria con cuentas
 	flask --app run.py run --host 0.0.0.0 --port 5000
 	```
 
-Entra en `http://localhost:5000`. El administrador crea cuentas de docentes; los estudiantes crean su propia cuenta desde **Crear cuenta** y el sistema solo les asigna el rol de alumno. El carnet debe contener siete dígitos. Los docentes pueden crear sus cursos y abrir sesiones de asistencia.
+Entra en `http://localhost:5000`. El administrador crea cuentas de docentes, da de alta los cursos y asigna docente, horario, modalidad, salón y estudiantes. Los estudiantes crean su propia cuenta desde **Crear cuenta** y el sistema solo les asigna el rol de alumno. El carnet debe contener siete dígitos. El docente gestiona sus cursos asignados, toma asistencia por QR o manualmente, cierra sesiones y consulta los avisos e historiales.
 
 ## Escaneo desde celular
 
@@ -55,7 +55,9 @@ Para que un teléfono alcance al servidor, ambos dispositivos deben estar en la 
 - `app/routes.py` conecta los casos de uso con la interfaz web.
 - El administrador puede revisar cuentas, carnets, cursos de cada docente y el historial global de asistencia.
 - Los docentes y administradores pueden descargar los registros por curso en CSV o PDF.
-- Los QR contienen tokens aleatorios cuya huella se guarda en la base de datos; vencen a los 15 minutos y la restricción única impide duplicados.
+- Los QR contienen tokens aleatorios cuya huella se guarda en la base de datos; vencen a los 5 minutos, pueden renovarse desde la sesión y la restricción única impide duplicados.
+- Al cerrar una sesión, los estudiantes asignados sin registro quedan como ausentes. Cada registro conserva estado (presente, ausente o justificado), hora y origen (QR o docente).
+- Los avisos docentes quedan en el historial y aparecen en el panel del estudiante; los avisos preventivos se generan bajo 90% de asistencia y el mínimo de referencia para examen final es 80%.
 - Las contraseñas se guardan con hash, las rutas se protegen por rol y las mutaciones requieren token CSRF.
 
 ## Pruebas
