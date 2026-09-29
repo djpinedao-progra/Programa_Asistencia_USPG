@@ -1,4 +1,5 @@
 import base64
+import csv
 import hashlib
 import io
 import secrets
@@ -7,7 +8,7 @@ from functools import wraps
 from urllib.parse import urljoin
 
 import qrcode
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -22,6 +23,7 @@ from flask import (
     flash,
     jsonify,
     redirect,
+    Response,
     render_template,
     request,
     send_file,
@@ -30,9 +32,18 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 from app import db
-from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, Notice, User
+from app.models import (
+    Attendance,
+    AttendanceSession,
+    AuditLog,
+    Course,
+    CourseEnrollment,
+    Notice,
+    User,
+)
 from app.repositories import AttendanceRepository, CourseRepository, UserRepository
-from app.services import AttendanceService, CourseService, UserService
+from app.services import AttendanceService, AuditService, CourseService, UserService
+from app.time_utils import local_date_utc_bounds, local_datetime, utc_isoformat
 
 main = Blueprint("main", __name__)
 
@@ -55,6 +66,15 @@ def roles_required(*roles):
         return wrapped
 
     return decorator
+
+
+def _local_date_bounds_or_none(value):
+    if not value:
+        return None
+    try:
+        return local_date_utc_bounds(value, current_app.config["APP_TIMEZONE"])
+    except ValueError:
+        return None
 
 
 @main.route("/", methods=["GET", "POST"])
@@ -123,6 +143,7 @@ def admin_dashboard():
                 request.form.get("password", ""),
                 request.form.get("role", ""),
                 request.form.get("carnet", ""),
+                actor_id=current_user.id,
             )
             flash("Usuario creado correctamente.", "success")
             return redirect(url_for("main.admin_dashboard"))
@@ -130,14 +151,12 @@ def admin_dashboard():
             flash(str(error), "error")
     users = UserRepository().list_all()
     courses = CourseRepository().list_all()
-    attendances = AttendanceRepository().list_all()
     student_summaries = _admin_student_summaries()
     session_summaries = _admin_session_summaries()[:6]
     return render_template(
         "admin.html",
         users=users,
         courses=courses,
-        attendances=attendances,
         teachers=[user for user in users if user.role == "docente"],
         students=[user for user in users if user.role == "alumno"],
         at_risk_students=sum(row["risk"] != "ninguno" for row in student_summaries),
@@ -150,7 +169,7 @@ def admin_dashboard():
 def update_student_carnet(user_id):
     try:
         UserService().assign_student_carnet(
-            user_id, request.form.get("carnet", "")
+            user_id, request.form.get("carnet", ""), actor_id=current_user.id
         )
         flash("Carnet actualizado.", "success")
     except ValueError as error:
@@ -171,6 +190,7 @@ def admin_create_course():
             request.form.get("location_type", ""),
             request.form.get("classroom", ""),
             request.form.getlist("student_ids"),
+            actor_id=current_user.id,
         )
         flash("Curso creado y asignaciones guardadas.", "success")
     except (ValueError, TypeError) as error:
@@ -193,6 +213,7 @@ def admin_update_course(course_id):
             request.form.get("is_active") == "on",
             request.form.get("name", ""),
             request.form.get("code", ""),
+            actor_id=current_user.id,
         )
         flash("Asignación del curso actualizada.", "success")
     except (ValueError, TypeError) as error:
@@ -206,17 +227,19 @@ def _admin_student_summaries(course_id=None, session_date=None):
     ).all()
     courses = CourseRepository().list_all()
     course_by_id = {course.id: course for course in courses}
-    enrollments = db.session.scalars(select(CourseEnrollment)).all()
     course_ids_by_student = {student.id: set() for student in students}
-    for enrollment in enrollments:
-        course_ids_by_student.setdefault(enrollment.student_id, set()).add(
-            enrollment.course_id
-        )
-    historical_records = AttendanceRepository().list_all()
-    for record in historical_records:
-        course_ids_by_student.setdefault(record.student_id, set()).add(
-            record.session.course_id
-        )
+    enrollments = db.session.execute(
+        select(CourseEnrollment.student_id, CourseEnrollment.course_id)
+    ).all()
+    for student_id, enrolled_course_id in enrollments:
+        course_ids_by_student.setdefault(student_id, set()).add(enrolled_course_id)
+    historical_courses = db.session.execute(
+        select(Attendance.student_id, AttendanceSession.course_id)
+        .join(AttendanceSession)
+        .distinct()
+    ).all()
+    for student_id, historical_course_id in historical_courses:
+        course_ids_by_student.setdefault(student_id, set()).add(historical_course_id)
     if course_id:
         students = [
             student
@@ -231,44 +254,68 @@ def _admin_student_summaries(course_id=None, session_date=None):
     }
     sessions = []
     if relevant_course_ids:
+        session_statement = select(AttendanceSession).where(
+            AttendanceSession.course_id.in_(relevant_course_ids),
+            AttendanceSession.closed_at.is_not(None),
+        )
+        if session_date:
+            bounds = _local_date_bounds_or_none(session_date)
+            if bounds:
+                start, end = bounds
+                session_statement = session_statement.where(
+                    AttendanceSession.created_at >= start,
+                    AttendanceSession.created_at < end,
+                )
+            else:
+                session_statement = session_statement.where(AttendanceSession.id == -1)
         sessions = db.session.scalars(
-            select(AttendanceSession)
-            .where(
-                AttendanceSession.course_id.in_(relevant_course_ids),
-                AttendanceSession.closed_at.is_not(None),
-            )
-            .order_by(AttendanceSession.created_at.desc())
+            session_statement.order_by(AttendanceSession.created_at.desc())
         ).all()
-    if session_date:
-        sessions = [
-            item for item in sessions
-            if item.created_at.date().isoformat() == session_date
-        ]
     session_ids = {item.id for item in sessions}
-    records = []
+    status_by_student_course = {}
     if session_ids:
-        records = db.session.scalars(
-            select(Attendance).where(Attendance.session_id.in_(session_ids))
+        status_rows = db.session.execute(
+            select(
+                Attendance.student_id,
+                AttendanceSession.course_id,
+                Attendance.status,
+                func.count(),
+            )
+            .join(AttendanceSession)
+            .where(Attendance.session_id.in_(session_ids))
+            .group_by(Attendance.student_id, AttendanceSession.course_id, Attendance.status)
         ).all()
-    record_by_key = {
-        (record.student_id, record.session_id): record for record in records
-    }
+        for student_id, course_id_for_status, status, count in status_rows:
+            status_by_student_course.setdefault(
+                (student_id, course_id_for_status), {}
+            )[status] = count
+    total_sessions_by_course = {}
+    for attendance_session in sessions:
+        total_sessions_by_course[attendance_session.course_id] = (
+            total_sessions_by_course.get(attendance_session.course_id, 0) + 1
+        )
     summaries = []
     for student in students:
         student_course_ids = course_ids_by_student.get(student.id, set())
         if course_id:
             student_course_ids = student_course_ids & {course_id}
-        student_sessions = [
-            item for item in sessions if item.course_id in student_course_ids
-        ]
-        present = absent = justified = 0
-        for attendance_session in student_sessions:
-            record = record_by_key.get((student.id, attendance_session.id))
-            status = record.status if record else "ausente"
-            present += status == "presente"
-            absent += status == "ausente"
-            justified += status == "justificado"
-        total = len(student_sessions)
+        total = sum(
+            total_sessions_by_course.get(student_course_id, 0)
+            for student_course_id in student_course_ids
+        )
+        present = sum(
+            status_by_student_course.get((student.id, student_course_id), {}).get(
+                "presente", 0
+            )
+            for student_course_id in student_course_ids
+        )
+        justified = sum(
+            status_by_student_course.get((student.id, student_course_id), {}).get(
+                "justificado", 0
+            )
+            for student_course_id in student_course_ids
+        )
+        absent = max(0, total - present - justified)
         percentage = round(present / total * 100) if total else 0
         risk = "alto" if total and percentage < 60 else (
             "medio" if total and percentage < 80 else "ninguno"
@@ -294,20 +341,34 @@ def _admin_student_summaries(course_id=None, session_date=None):
     return summaries
 
 
-def _admin_session_summaries(course_id=None, teacher_id=None, session_date=None):
+def _admin_session_summaries(
+    course_id=None, teacher_id=None, session_date=None, page=None, page_size=25
+):
     statement = select(AttendanceSession).join(Course)
+    conditions = []
     if course_id:
-        statement = statement.where(AttendanceSession.course_id == course_id)
+        conditions.append(AttendanceSession.course_id == course_id)
     if teacher_id:
-        statement = statement.where(Course.teacher_id == teacher_id)
-    sessions = db.session.scalars(
-        statement.order_by(AttendanceSession.created_at.desc())
-    ).all()
+        conditions.append(Course.teacher_id == teacher_id)
     if session_date:
-        sessions = [
-            item for item in sessions
-            if item.created_at.date().isoformat() == session_date
-        ]
+        bounds = _local_date_bounds_or_none(session_date)
+        if bounds:
+            start, end = bounds
+            conditions.extend(
+                [AttendanceSession.created_at >= start, AttendanceSession.created_at < end]
+            )
+        else:
+            conditions.append(AttendanceSession.id == -1)
+    if conditions:
+        statement = statement.where(*conditions)
+    total = db.session.scalar(
+        select(func.count(AttendanceSession.id)).select_from(AttendanceSession)
+        .join(Course).where(*conditions)
+    )
+    statement = statement.order_by(AttendanceSession.created_at.desc())
+    if page is not None:
+        statement = statement.offset((page - 1) * page_size).limit(page_size)
+    sessions = db.session.scalars(statement).all()
     summaries = []
     for attendance_session in sessions:
         records = attendance_session.attendances
@@ -324,7 +385,7 @@ def _admin_session_summaries(course_id=None, teacher_id=None, session_date=None)
                 "total": assigned_count,
             }
         )
-    return summaries
+    return (summaries, total) if page is not None else summaries
 
 
 @main.get("/admin/estudiantes")
@@ -377,6 +438,7 @@ def admin_user_profile(user_id):
                 request.form.get("name", ""),
                 request.form.get("email", ""),
                 request.form.get("carnet", ""),
+                actor_id=current_user.id,
             )
             flash("Perfil actualizado.", "success")
             return redirect(url_for("main.admin_user_profile", user_id=user.id))
@@ -391,6 +453,40 @@ def admin_user_profile(user_id):
     )
 
 
+@main.route("/cuenta/seguridad", methods=["GET", "POST"])
+@login_required
+def account_security():
+    if request.method == "POST":
+        try:
+            UserService().change_password(
+                current_user.id,
+                request.form.get("current_password", ""),
+                request.form.get("new_password", ""),
+                request.form.get("confirm_password", ""),
+            )
+            flash("Contraseña actualizada.", "success")
+            return redirect(url_for("main.account_security"))
+        except ValueError as error:
+            flash(str(error), "error")
+    return render_template("account_security.html")
+
+
+@main.post("/admin/usuarios/<int:user_id>/restablecer-contrasena")
+@roles_required("admin")
+def admin_reset_user_password(user_id):
+    try:
+        UserService().admin_reset_password(
+            user_id,
+            request.form.get("new_password", ""),
+            request.form.get("confirm_password", ""),
+            actor_id=current_user.id,
+        )
+        flash("Contraseña restablecida. Comunica la clave al usuario por un canal seguro.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("main.admin_user_profile", user_id=user_id))
+
+
 @main.post("/admin/cursos/<int:course_id>/estado")
 @roles_required("admin")
 def admin_toggle_course(course_id):
@@ -398,7 +494,11 @@ def admin_toggle_course(course_id):
     if not course:
         abort(404)
     try:
-        CourseService.set_course_active(course_id, request.form.get("is_active") == "on")
+        CourseService.set_course_active(
+            course_id,
+            request.form.get("is_active") == "on",
+            actor_id=current_user.id,
+        )
         flash(
             "Curso habilitado para el docente." if course.is_active
             else "Curso deshabilitado; las sesiones abiertas se cerraron.",
@@ -432,6 +532,165 @@ def admin_courses():
         "admin_courses.html", courses=courses, teachers=teachers,
         students=students, query=query, selected_teacher=teacher_id,
     )
+
+
+@main.route("/admin/cursos/importar", methods=["GET", "POST"])
+@roles_required("admin")
+def admin_import_course_enrollments():
+    if request.method == "GET":
+        return render_template("admin_course_import.html")
+
+    if request.form.get("action") in {"import", "download-errors"}:
+        course_codes = request.form.getlist("course_code")
+        carnets = request.form.getlist("carnet")
+        if len(course_codes) != len(carnets):
+            abort(400, description="Las filas del archivo no tienen el mismo formato.")
+        rows = _preview_enrollment_rows(
+            [
+                (index + 2, code, carnet)
+                for index, (code, carnet) in enumerate(zip(course_codes, carnets))
+            ]
+        )
+        if request.form.get("action") == "download-errors":
+            output = io.StringIO(newline="")
+            writer = csv.writer(output)
+            writer.writerow(["line", "course_code", "carnet", "error"])
+            writer.writerows(
+                [row["line"], _csv_safe(row["course_code"]), _csv_safe(row["carnet"]), row["status"]]
+                for row in rows
+                if not row["valid"] and row["status"] != "Ya está matriculado"
+            )
+            return Response(
+                "\ufeff" + output.getvalue(),
+                mimetype="text/csv",
+                headers={
+                    "Content-Disposition": "attachment; filename=matriculas-rechazadas.csv"
+                },
+            )
+        enrollments = [
+            (row["course_id"], row["student_id"])
+            for row in rows if row["valid"]
+        ]
+        try:
+            added = CourseService().bulk_enroll(
+                enrollments, actor_id=current_user.id
+            )
+        except ValueError as error:
+            flash(str(error), "error")
+            return render_template(
+                "admin_course_import.html", rows=rows, preview=False, imported=0
+            )
+        for row in rows:
+            if row["valid"]:
+                row["status"] = "Matriculado"
+        return render_template(
+            "admin_course_import.html", rows=rows, preview=False, imported=added
+        )
+
+    uploaded_file = request.files.get("file")
+    if not uploaded_file or not uploaded_file.filename:
+        flash("Selecciona un archivo CSV.", "error")
+        return redirect(url_for("main.admin_import_course_enrollments"))
+    content = uploaded_file.stream.read(2 * 1024 * 1024 + 1)
+    if len(content) > 2 * 1024 * 1024:
+        flash("El archivo supera el límite de 2 MB.", "error")
+        return redirect(url_for("main.admin_import_course_enrollments"))
+    try:
+        reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+        headers = {
+            (header or "").strip().casefold(): header
+            for header in (reader.fieldnames or [])
+        }
+        course_header = next(
+            (headers[key] for key in ("course_code", "codigo_curso", "curso") if key in headers),
+            None,
+        )
+        carnet_header = headers.get("carnet")
+        if not course_header or not carnet_header:
+            raise ValueError("El CSV debe incluir las columnas course_code y carnet.")
+        input_rows = [
+            (line_number, row.get(course_header, ""), row.get(carnet_header, ""))
+            for line_number, row in enumerate(reader, start=2)
+        ]
+    except (UnicodeDecodeError, csv.Error, ValueError) as error:
+        flash(str(error) or "No se pudo leer el archivo CSV.", "error")
+        return redirect(url_for("main.admin_import_course_enrollments"))
+    rows = _preview_enrollment_rows(input_rows)
+    return render_template(
+        "admin_course_import.html", rows=rows, preview=True, imported=0
+    )
+
+
+@main.get("/admin/cursos/importar/plantilla.csv")
+@roles_required("admin")
+def admin_course_import_template():
+    output = io.StringIO(newline="")
+    csv.writer(output).writerow(["course_code", "carnet"])
+    return Response(
+        "\ufeff" + output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=plantilla-matriculas.csv"},
+    )
+
+
+def _csv_safe(value):
+    value = str(value or "")
+    if value[:1] in {"=", "+", "-", "@", "\t", "\r"}:
+        return "'" + value
+    return value
+
+
+def _preview_enrollment_rows(input_rows):
+    courses = {
+        course.code.casefold(): course
+        for course in CourseRepository().list_all()
+    }
+    students = {
+        student.carnet: student
+        for student in db.session.scalars(
+            select(User).where(User.role == "alumno", User.carnet.is_not(None))
+        ).all()
+    }
+    existing_enrollments = set(
+        db.session.execute(select(CourseEnrollment.course_id, CourseEnrollment.student_id)).all()
+    )
+    seen = set()
+    results = []
+    for line_number, raw_code, raw_carnet in input_rows:
+        code = (raw_code or "").strip().upper()
+        carnet = (raw_carnet or "").strip()
+        course = courses.get(code.casefold())
+        student = students.get(carnet)
+        valid = False
+        if not code or not carnet:
+            status = "Falta código de curso o carnet"
+        elif not course:
+            status = "Curso no encontrado"
+        elif not course.is_active:
+            status = "El curso está deshabilitado"
+        elif not student:
+            status = "Alumno no encontrado"
+        elif (course.id, student.id) in seen:
+            status = "Duplicado en el archivo"
+        elif (course.id, student.id) in existing_enrollments:
+            status = "Ya está matriculado"
+        else:
+            status = "Listo para matricular"
+            valid = True
+        if course and student:
+            seen.add((course.id, student.id))
+        results.append(
+            {
+                "line": line_number,
+                "course_code": code,
+                "carnet": carnet,
+                "status": status,
+                "valid": valid,
+                "course_id": course.id if course else None,
+                "student_id": student.id if student else None,
+            }
+        )
+    return results
 
 
 @main.get("/admin/asistencias")
@@ -484,11 +743,38 @@ def admin_history():
     teachers = db.session.scalars(
         select(User).where(User.role == "docente").order_by(User.name)
     ).all()
-    sessions = _admin_session_summaries(course_id, teacher_id, session_date or None)
+    requested_page = max(1, request.args.get("page", 1, type=int))
+    sessions, total = _admin_session_summaries(
+        course_id, teacher_id, session_date or None, page=requested_page
+    )
+    pages = max(1, (total + 24) // 25)
+    page = min(requested_page, pages)
+    if page != requested_page:
+        sessions, total = _admin_session_summaries(
+            course_id, teacher_id, session_date or None, page=page
+        )
     return render_template(
         "admin_history.html", sessions=sessions, courses=courses,
         teachers=teachers, selected_course=course_id,
         selected_teacher=teacher_id, session_date=session_date,
+        page=page, pages=pages, total=total,
+    )
+
+
+@main.get("/admin/auditoria")
+@roles_required("admin")
+def admin_audit_log():
+    total = db.session.scalar(select(func.count(AuditLog.id))) or 0
+    pages = max(1, (total + 49) // 50)
+    page = min(max(1, request.args.get("page", 1, type=int)), pages)
+    entries = db.session.scalars(
+        select(AuditLog)
+        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .offset((page - 1) * 50)
+        .limit(50)
+    ).all()
+    return render_template(
+        "admin_audit.html", entries=entries, page=page, pages=pages, total=total
     )
 
 
@@ -614,8 +900,12 @@ def admin_session_report_pdf(session_id):
                 Paragraph(escape(student.name), getSampleStyleSheet()["BodyText"]),
                 student.carnet or "—",
                 record.status.capitalize() if record else "Pendiente",
-                recorded_at.strftime("%d/%m/%Y") if recorded_at else "—",
-                recorded_at.strftime("%H:%M") if recorded_at else "—",
+                local_datetime(recorded_at, current_app.config["APP_TIMEZONE"]).strftime(
+                    "%d/%m/%Y"
+                ) if recorded_at else "—",
+                local_datetime(recorded_at, current_app.config["APP_TIMEZONE"]).strftime(
+                    "%H:%M"
+                ) if recorded_at else "—",
                 {"qr": "Código QR", "manual": "Docente", "cierre": "Cierre"}.get(
                     record.source if record else "", "—"
                 ),
@@ -633,7 +923,7 @@ def admin_session_report_pdf(session_id):
             escape(
                 f"{course.code} · Docente: {course.teacher.name} · "
                 f"Horario: {course.schedule or '—'} · "
-                f"Sesión: {attendance_session.created_at.strftime('%d/%m/%Y %H:%M')}"
+                f"Sesión: {local_datetime(attendance_session.created_at, current_app.config['APP_TIMEZONE']).strftime('%d/%m/%Y %H:%M')}"
             ),
             styles["BodyText"],
         ),
@@ -673,31 +963,44 @@ def _teacher_course_metrics(course):
         )
         .order_by(AttendanceSession.closed_at.desc())
     ).all()
-    enrollments = db.session.scalars(
-        select(CourseEnrollment)
+    roster = db.session.scalars(
+        select(User)
+        .join(CourseEnrollment, CourseEnrollment.student_id == User.id)
         .where(CourseEnrollment.course_id == course.id)
-        .order_by(CourseEnrollment.student_id)
+        .order_by(User.id)
     ).all()
-    records = db.session.scalars(
-        select(Attendance)
-        .join(AttendanceSession)
-        .where(AttendanceSession.course_id == course.id)
-    ).all()
-    roster = [enrollment.student for enrollment in enrollments]
     if not roster:
-        roster = list({record.student_id: record.student for record in records}.values())
-    records_by_key = {
-        (record.student_id, record.session_id): record for record in records
-    }
+        historical_student_ids = db.session.scalars(
+            select(Attendance.student_id)
+            .join(AttendanceSession)
+            .where(AttendanceSession.course_id == course.id)
+            .distinct()
+        ).all()
+        if historical_student_ids:
+            roster = db.session.scalars(
+                select(User)
+                .where(User.id.in_(historical_student_ids))
+                .order_by(User.id)
+            ).all()
+    counts_by_student = {}
+    if sessions:
+        counts = db.session.execute(
+            select(Attendance.student_id, Attendance.status, func.count())
+            .join(AttendanceSession)
+            .where(
+                AttendanceSession.course_id == course.id,
+                AttendanceSession.closed_at.is_not(None),
+            )
+            .group_by(Attendance.student_id, Attendance.status)
+        ).all()
+        for student_id, status, count in counts:
+            counts_by_student.setdefault(student_id, {})[status] = count
     students = []
     for student in roster:
-        present = absent = justified = 0
-        for attendance_session in sessions:
-            record = records_by_key.get((student.id, attendance_session.id))
-            status = record.status if record else "ausente"
-            present += status == "presente"
-            absent += status == "ausente"
-            justified += status == "justificado"
+        status_counts = counts_by_student.get(student.id, {})
+        present = status_counts.get("presente", 0)
+        justified = status_counts.get("justificado", 0)
+        absent = max(0, len(sessions) - present - justified)
         percentage = round(present / len(sessions) * 100) if sessions else 0
         students.append(
             {
@@ -866,42 +1169,51 @@ def teacher_students():
 def teacher_history():
     courses = CourseRepository().list_for_teacher(current_user.id)
     course_ids = [course.id for course in courses]
-    records = []
-    if course_ids:
-        records = db.session.scalars(
-            select(Attendance)
-            .join(AttendanceSession)
-            .where(AttendanceSession.course_id.in_(course_ids))
-            .order_by(Attendance.recorded_at.desc())
-            .limit(500)
-        ).all()
     filters = {
         "curso": request.args.get("curso", ""),
         "fecha": request.args.get("fecha", ""),
         "estudiante": request.args.get("estudiante", "").strip(),
         "estado": request.args.get("estado", ""),
     }
-    if filters["curso"].isdigit():
-        records = [
-            record for record in records
-            if record.session.course_id == int(filters["curso"])
-        ]
+    conditions = [AttendanceSession.course_id.in_(course_ids)] if course_ids else []
+    if filters["curso"]:
+        if filters["curso"].isdigit() and int(filters["curso"]) in course_ids:
+            conditions.append(AttendanceSession.course_id == int(filters["curso"]))
+        else:
+            conditions.append(AttendanceSession.course_id == -1)
     if filters["fecha"]:
-        records = [
-            record for record in records
-            if record.recorded_at.date().isoformat() == filters["fecha"]
-        ]
+        bounds = _local_date_bounds_or_none(filters["fecha"])
+        if bounds:
+            start, end = bounds
+            conditions.extend(
+                [Attendance.recorded_at >= start, Attendance.recorded_at < end]
+            )
+        else:
+            conditions.append(Attendance.id == -1)
     if filters["estudiante"]:
-        needle = filters["estudiante"].casefold()
-        records = [
-            record for record in records
-            if needle in record.student.name.casefold()
-            or needle in (record.student.carnet or "").casefold()
-        ]
+        needle = f"%{filters['estudiante']}%"
+        conditions.append(
+            or_(User.name.ilike(needle), User.carnet.ilike(needle))
+        )
     if filters["estado"] in {"presente", "ausente", "justificado"}:
-        records = [record for record in records if record.status == filters["estado"]]
+        conditions.append(Attendance.status == filters["estado"])
+    total = db.session.scalar(
+        select(func.count(Attendance.id)).select_from(Attendance)
+        .join(AttendanceSession).join(User, Attendance.student_id == User.id)
+        .where(*conditions)
+    ) if conditions else 0
+    pages = max(1, (total + 24) // 25)
+    page = min(max(1, request.args.get("page", 1, type=int)), pages)
+    records = db.session.scalars(
+        select(Attendance).join(AttendanceSession)
+        .join(User, Attendance.student_id == User.id)
+        .where(*conditions)
+        .order_by(Attendance.recorded_at.desc(), Attendance.id.desc())
+        .offset((page - 1) * 25).limit(25)
+    ).all() if conditions else []
     return render_template(
-        "teacher_history.html", courses=courses, records=records, filters=filters
+        "teacher_history.html", courses=courses, records=records, filters=filters,
+        page=page, pages=pages, total=total,
     )
 
 
@@ -914,10 +1226,20 @@ def correct_attendance_record(attendance_id):
     status = request.form.get("status", "")
     if status not in {"presente", "ausente", "justificado"}:
         abort(400)
+    previous_status = attendance.status
     attendance.status = status
     attendance.source = "manual"
     attendance.modified_by_id = current_user.id
     attendance.recorded_at = datetime.now(timezone.utc)
+    AuditService.record(
+        current_user.id, "attendance_corrected", "attendance", attendance.id,
+        {
+            "student_id": attendance.student_id,
+            "session_id": attendance.session_id,
+            "previous_status": previous_status,
+            "status": status,
+        },
+    )
     db.session.commit()
     flash("Registro corregido manualmente.", "success")
     return redirect(url_for("main.teacher_history"))
@@ -1105,7 +1427,7 @@ def attendance_session_status(session_id):
                 "status": record.status if record else "pendiente",
                 "source": record.source if record else "",
                 "recorded_at": (
-                    record.recorded_at.isoformat() if record else None
+                    utc_isoformat(record.recorded_at) if record else None
                 ),
             }
         )
@@ -1138,6 +1460,7 @@ def set_session_attendance(session_id, student_id):
         )
     )
     now = datetime.now(timezone.utc)
+    previous_status = attendance.status if attendance else None
     if attendance is None:
         attendance = Attendance(
             session_id=session_id,
@@ -1149,6 +1472,15 @@ def set_session_attendance(session_id, student_id):
     attendance.source = "manual"
     attendance.modified_by_id = current_user.id
     attendance.recorded_at = now
+    AuditService.record(
+        current_user.id, "attendance_corrected", "attendance", attendance.id,
+        {
+            "student_id": student.id,
+            "session_id": session_id,
+            "previous_status": previous_status,
+            "status": status,
+        },
+    )
     db.session.commit()
     return redirect(url_for("main.teacher_session", session_id=session_id))
 
@@ -1190,6 +1522,10 @@ def close_attendance_session(session_id):
 @roles_required("alumno")
 def student_dashboard():
     attendances = AttendanceRepository().list_for_student(current_user.id)
+    history_total = len(attendances)
+    history_pages = max(1, (history_total + 24) // 25)
+    history_page = min(max(1, request.args.get("page", 1, type=int)), history_pages)
+    history_attendances = attendances[(history_page - 1) * 25 : history_page * 25]
     course_ids = {attendance.session.course_id for attendance in attendances}
     course_ids.update(
         db.session.scalars(
@@ -1273,6 +1609,10 @@ def student_dashboard():
     return render_template(
         "student.html",
         attendances=attendances,
+        history_attendances=history_attendances,
+        history_total=history_total,
+        history_page=history_page,
+        history_pages=history_pages,
         recent_attendances=attendances[:6],
         courses=courses,
         total_sessions=total_sessions,
@@ -1324,7 +1664,9 @@ def export_attendance(course_id):
             row.session.course.name,
             row.session.course.code,
             row.session.course.teacher.name,
-            row.recorded_at.isoformat(),
+            local_datetime(
+                row.recorded_at, current_app.config["APP_TIMEZONE"]
+            ).isoformat(),
         )
         lines.append(",".join('"' + value.replace('"', '""') + '"' for value in values))
     from flask import Response
@@ -1376,7 +1718,9 @@ def export_attendance_pdf(course_id):
             row.student.email,
             row.session.course.code,
             row.session.course.teacher.name,
-            row.recorded_at.strftime("%d/%m/%Y %H:%M"),
+            local_datetime(
+                row.recorded_at, current_app.config["APP_TIMEZONE"]
+            ).strftime("%d/%m/%Y %H:%M"),
         )
         data.append([Paragraph(escape(value), cell_style) for value in values])
     if not rows:

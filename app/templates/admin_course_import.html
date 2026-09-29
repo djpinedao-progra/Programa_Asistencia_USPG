@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Importar matrículas{% endblock %}
+{% block content %}
+{% include "admin_nav.html" %}
+<a class="back-link" href="{{ url_for('main.admin_courses') }}">Volver a cursos</a>
+<div class="page-heading"><div><p class="eyebrow">MATRÍCULA MASIVA</p><h1>Importar matrículas</h1><p class="muted">Asigna alumnos existentes a cursos mediante su código y carnet.</p></div></div>
+<section class="admin-data-section">
+  {% if rows is not defined %}
+  <form method="post" enctype="multipart/form-data" class="stack-form import-upload-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="enrollment-csv">Archivo CSV</label>
+    <input id="enrollment-csv" type="file" name="file" accept=".csv,text/csv" required>
+    <p class="muted">Incluye las columnas <code>course_code</code> y <code>carnet</code>. También se acepta <code>codigo_curso</code> o <code>curso</code> como nombre de la primera columna. Máximo 2 MB.</p>
+    <a class="text-link" href="{{ url_for('main.admin_course_import_template') }}">Descargar plantilla CSV</a>
+    <button class="button button-primary" type="submit">Revisar archivo</button>
+  </form>
+  {% else %}
+  {% if preview %}
+  <div class="section-heading"><div><h2>Vista previa</h2><p class="muted">Revisa las filas aceptadas y los motivos de rechazo antes de guardar.</p></div><span class="section-number">{{ rows|selectattr('valid')|list|length }} listas</span></div>
+  {% else %}
+  <div class="section-heading"><div><h2>Resultado de importación</h2><p class="muted">Se agregaron {{ imported }} matrículas nuevas.</p></div></div>
+  {% endif %}
+  <div class="table-wrap"><table><thead><tr><th>Fila</th><th>Código de curso</th><th>Carnet</th><th>Resultado</th></tr></thead><tbody>
+    {% for row in rows %}<tr><td>{{ row.line }}</td><td>{{ row.course_code or '—' }}</td><td>{{ row.carnet or '—' }}</td><td>{{ row.status }}</td></tr>
+    {% else %}<tr><td colspan="4" class="empty-cell">El archivo no contiene filas para importar.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if preview %}
+  <form method="post" class="import-confirm-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% for row in rows %}<input type="hidden" name="course_code" value="{{ row.course_code }}"><input type="hidden" name="carnet" value="{{ row.carnet }}">{% endfor %}
+    <button class="button button-primary" type="submit" name="action" value="import" {% if not rows|selectattr('valid')|list %}disabled{% endif %}>Guardar matrículas válidas</button>
+    <button class="button button-outline button-small" type="submit" name="action" value="download-errors">Descargar filas rechazadas</button>
+    <a class="text-link" href="{{ url_for('main.admin_import_course_enrollments') }}">Cancelar</a>
+  </form>
+  {% elif rows|rejectattr('valid')|list %}
+  <form method="post" class="import-confirm-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="download-errors">{% for row in rows %}<input type="hidden" name="course_code" value="{{ row.course_code }}"><input type="hidden" name="carnet" value="{{ row.carnet }}">{% endfor %}<button class="button button-outline button-small" type="submit">Descargar filas rechazadas</button></form>
+  {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

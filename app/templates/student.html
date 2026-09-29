@@ -39,7 +39,7 @@
   <div class="recent-list">
     <div class="section-heading"><div><p class="eyebrow">ACTIVIDAD RECIENTE</p><h3>Últimas asistencias</h3></div><a href="#historial" class="text-link">Ver historial</a></div>
     {% for attendance in recent_attendances %}
-    <div class="recent-attendance"><span class="recent-check {% if attendance.status != 'presente' %}recent-check-absence{% endif %}" aria-hidden="true">{{ '✓' if attendance.status == 'presente' else '!' }}</span><div><strong>{{ attendance.session.course.name }}</strong><span>{{ attendance.session.course.code }} · {{ attendance.status|capitalize }}</span></div><time datetime="{{ attendance.recorded_at.isoformat() }}">{{ attendance.recorded_at.strftime('%d/%m/%Y · %H:%M') }}</time></div>
+    <div class="recent-attendance"><span class="recent-check {% if attendance.status != 'presente' %}recent-check-absence{% endif %}" aria-hidden="true">{{ '✓' if attendance.status == 'presente' else '!' }}</span><div><strong>{{ attendance.session.course.name }}</strong><span>{{ attendance.session.course.code }} · {{ attendance.status|capitalize }}</span></div><time datetime="{{ (attendance.recorded_at|localtime).isoformat() }}">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></div>
     {% else %}<p class="empty-student">Aún no tienes asistencias registradas. Escanea el QR que comparte tu docente para comenzar.</p>{% endfor %}
   </div>
 </section>
@@ -54,7 +54,7 @@
       <div class="course-progress-track" role="img" aria-label="{{ course.percentage }} por ciento de asistencia"><span style="width: {{ course.percentage }}%"></span></div>
       <div class="course-stats"><span><strong>{{ course.attended_count }}</strong> asistencias</span><span><strong>{{ course.absence_count }}</strong> faltas</span><span>{{ course.total_sessions }} sesiones</span></div>
       <details class="course-attendance-detail"><summary>Ver asistencias del curso</summary>
-        {% if course.attendance_records %}<ul>{% for attendance in course.attendance_records %}<li><span>{{ attendance.status|capitalize }} · {{ {'qr': 'Código QR', 'manual': 'Docente', 'cierre': 'Cierre'}[attendance.source] }}</span><time datetime="{{ attendance.recorded_at.isoformat() }}">{{ attendance.recorded_at.strftime('%d/%m/%Y · %H:%M') }}</time></li>{% endfor %}</ul>{% else %}<p>No hay registros de asistencia.</p>{% endif %}
+        {% if course.attendance_records %}<ul>{% for attendance in course.attendance_records %}<li><span>{{ attendance.status|capitalize }} · {{ {'qr': 'Código QR', 'manual': 'Docente', 'cierre': 'Cierre'}[attendance.source] }}</span><time datetime="{{ (attendance.recorded_at|localtime).isoformat() }}">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></li>{% endfor %}</ul>{% else %}<p>No hay registros de asistencia.</p>{% endif %}
       </details>
     </article>
   {% else %}
@@ -66,7 +66,7 @@
 <section class="student-section" id="avisos">
   <div class="section-heading"><div><p class="eyebrow">ATENCIÓN ACADÉMICA</p><h2>Avisos</h2></div><span class="section-number">{{ notices|length }} activos</span></div>
   <div class="notice-minimum"><strong>80% es el mínimo requerido</strong><span>Debajo de ese porcentaje podrías perder el derecho a examen final.</span></div>
-  {% if received_notices %}<div class="received-notices"><h3>Avisos de tus docentes</h3>{% for notice in received_notices %}<article class="notice-item"><span class="notice-mark" aria-hidden="true">i</span><div><strong>{{ notice.course.name }} · {{ notice.course.code }}</strong><p>{{ notice.message }}</p><time>{{ notice.created_at.strftime('%d/%m/%Y · %H:%M') }}</time></div></article>{% endfor %}</div>{% endif %}
+  {% if received_notices %}<div class="received-notices"><h3>Avisos de tus docentes</h3>{% for notice in received_notices %}<article class="notice-item"><span class="notice-mark" aria-hidden="true">i</span><div><strong>{{ notice.course.name }} · {{ notice.course.code }}</strong><p>{{ notice.message }}</p><time>{{ (notice.created_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></div></article>{% endfor %}</div>{% endif %}
   {% if notices %}<div class="notice-list">{% for course in notices %}
     <article class="notice-item {% if course.percentage < 80 %}notice-item-risk{% endif %}" data-notice-course="{{ course.course.code }}"><span class="notice-mark" aria-hidden="true">!</span><div><strong>{{ course.course.name }} · {{ course.course.code }}</strong><p>Tu asistencia es de {{ course.percentage }}%, por debajo del aviso preventivo de 90%. Tienes {{ course.absence_count }} faltas en {{ course.total_sessions }} sesiones.</p>{% if course.percentage < 80 %}<b>Riesgo: estás por debajo del mínimo de 80% para examen final.</b>{% endif %}</div></article>
   {% endfor %}</div>{% else %}<p class="empty-student">No tienes avisos de asistencia baja. Los cursos con menos de 90% aparecerán aquí.</p>{% endif %}
@@ -74,11 +74,12 @@
 </section>
 
 <section class="student-section student-history" id="historial">
-  <div class="section-heading"><div><p class="eyebrow">REGISTROS</p><h2>Historial de asistencias</h2></div><span class="section-number">{{ attendances|length }} registros</span></div>
+  <div class="section-heading"><div><p class="eyebrow">REGISTROS</p><h2>Historial de asistencias</h2></div><span class="section-number">{{ history_total }} registros</span></div>
   <div class="table-wrap"><table><thead><tr><th>Curso</th><th>Código</th><th>Estado</th><th>Fecha</th><th>Hora</th></tr></thead><tbody>
-    {% for attendance in attendances %}<tr><td class="primary-cell" data-label="Curso">{{ attendance.session.course.name }}</td><td data-label="Código">{{ attendance.session.course.code }}</td><td data-label="Estado">{{ attendance.status|capitalize }}</td><td data-label="Fecha">{{ attendance.recorded_at.strftime('%d/%m/%Y') }}</td><td data-label="Hora"><span class="time-cell">{{ attendance.recorded_at.strftime('%H:%M') }}</span></td></tr>
+    {% for attendance in history_attendances %}<tr><td class="primary-cell" data-label="Curso">{{ attendance.session.course.name }}</td><td data-label="Código">{{ attendance.session.course.code }}</td><td data-label="Estado">{{ attendance.status|capitalize }}</td><td data-label="Fecha">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y') }}</td><td data-label="Hora"><span class="time-cell">{{ (attendance.recorded_at|localtime).strftime('%H:%M') }}</span></td></tr>
     {% else %}<tr><td colspan="5" class="empty-cell">Tu historial de asistencia aparecerá aquí.</td></tr>{% endfor %}
   </tbody></table></div>
+  <nav class="pagination-controls" aria-label="Paginación del historial"><span>{{ history_attendances|length }} de {{ history_total }} registros · Página {{ history_page }} de {{ history_pages }}</span><div>{% if history_page > 1 %}<a class="button button-outline button-small" href="{{ url_for('main.student_dashboard', page=history_page - 1) }}#historial">Anterior</a>{% endif %}{% if history_page < history_pages %}<a class="button button-outline button-small" href="{{ url_for('main.student_dashboard', page=history_page + 1) }}#historial">Siguiente</a>{% endif %}</div></nav>
 </section>
 
 <div class="student-scan-heading" id="registrar-asistencia">

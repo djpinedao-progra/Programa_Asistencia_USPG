@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Auditoría · Administración{% endblock %}
+{% block content %}
+{% include "admin_nav.html" %}
+<div class="page-heading"><div><p class="eyebrow">TRAZABILIDAD</p><h1>Auditoría</h1><p class="muted">Cambios administrativos y correcciones manuales.</p></div><span class="heading-count">{{ total }} <small>eventos</small></span></div>
+<section class="admin-data-section">
+  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Actor</th><th>Acción</th><th>Entidad</th><th>Detalle</th></tr></thead><tbody>
+    {% for entry in entries %}<tr><td data-label="Fecha">{{ (entry.created_at|localtime).strftime('%d/%m/%Y · %H:%M:%S') }}</td><td data-label="Actor">{{ entry.actor.email if entry.actor else 'Cuenta eliminada' }}</td><td class="primary-cell" data-label="Acción">{{ entry.action|replace('_', ' ')|capitalize }}</td><td data-label="Entidad">{{ entry.entity_type }}{% if entry.entity_id %} · {{ entry.entity_id }}{% endif %}</td><td data-label="Detalle"><code>{{ entry.details|tojson }}</code></td></tr>
+    {% else %}<tr><td colspan="5" class="empty-cell">Todavía no hay eventos de auditoría.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <nav class="pagination-controls" aria-label="Paginación de auditoría"><span>{{ entries|length }} de {{ total }} eventos · Página {{ page }} de {{ pages }}</span><div>{% if page > 1 %}<a class="button button-outline button-small" href="{{ url_for('main.admin_audit_log', page=page - 1) }}">Anterior</a>{% endif %}{% if page < pages %}<a class="button button-outline button-small" href="{{ url_for('main.admin_audit_log', page=page + 1) }}">Siguiente</a>{% endif %}</div></nav>
+</section>
+{% endblock %}

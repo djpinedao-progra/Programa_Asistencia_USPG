@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Seguridad de la cuenta{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('main.dashboard') }}">Volver al panel</a>
+<div class="page-heading"><div><p class="eyebrow">CUENTA</p><h1>Seguridad</h1><p class="muted">Actualiza tu contraseña de acceso.</p></div></div>
+<section class="panel form-panel security-panel">
+  <form method="post" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="current-password">Contraseña actual</label><input id="current-password" name="current_password" type="password" autocomplete="current-password" required>
+    <label for="new-password">Nueva contraseña</label><input id="new-password" name="new_password" type="password" autocomplete="new-password" required>
+    <label for="confirm-password">Confirmar nueva contraseña</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" required>
+    <button class="button button-primary" type="submit">Actualizar contraseña</button>
+  </form>
+</section>
+{% endblock %}

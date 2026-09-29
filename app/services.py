@@ -10,11 +10,26 @@ from app import db
 from app.models import (
     Attendance,
     AttendanceSession,
+    AuditLog,
     Course,
     CourseEnrollment,
     User,
 )
 from app.repositories import AttendanceRepository, CourseRepository, UserRepository
+
+
+class AuditService:
+    @staticmethod
+    def record(actor_id, action, entity_type, entity_id=None, details=None):
+        db.session.add(
+            AuditLog(
+                actor_id=actor_id,
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                details=details or {},
+            )
+        )
 
 
 class UserService:
@@ -23,7 +38,7 @@ class UserService:
     def __init__(self, users=None):
         self.users = users or UserRepository()
 
-    def create_user(self, name, email, password, role, carnet=""):
+    def create_user(self, name, email, password, role, carnet="", actor_id=None):
         name, email = name.strip(), email.strip().lower()
         carnet = carnet.strip()
         if not name or "@" not in email or not password:
@@ -39,6 +54,12 @@ class UserService:
         user = User(name=name, email=email, carnet=carnet or None, role=role)
         user.set_password(password)
         try:
+            db.session.add(user)
+            db.session.flush()
+            AuditService.record(
+                actor_id or user.id, "user_created", "user", user.id,
+                {"role": role},
+            )
             return self.users.add(user)
         except IntegrityError as error:
             db.session.rollback()
@@ -47,7 +68,7 @@ class UserService:
     def register_student(self, name, email, carnet, password):
         return self.create_user(name, email, password, "alumno", carnet)
 
-    def assign_student_carnet(self, user_id, carnet):
+    def assign_student_carnet(self, user_id, carnet, actor_id=None):
         carnet = carnet.strip()
         if not re.fullmatch(r"\d{7}", carnet):
             raise ValueError("El carnet debe tener exactamente 7 dígitos.")
@@ -57,14 +78,20 @@ class UserService:
         existing_user = self.users.find_by_carnet(carnet)
         if existing_user and existing_user.id != user.id:
             raise ValueError("Ese carnet ya pertenece a otra cuenta.")
+        previous_carnet = user.carnet
         user.carnet = carnet
+        if previous_carnet != carnet:
+            AuditService.record(
+                actor_id, "carnet_updated", "user", user.id,
+                {"previous_carnet": previous_carnet, "carnet": carnet},
+            )
         try:
             return self.users.save(user)
         except IntegrityError as error:
             db.session.rollback()
             raise ValueError("Ese carnet ya pertenece a otra cuenta.") from error
 
-    def update_profile(self, user_id, name, email, carnet=""):
+    def update_profile(self, user_id, name, email, carnet="", actor_id=None):
         user = self.users.find_by_id(user_id)
         name, email, carnet = name.strip(), email.strip().lower(), carnet.strip()
         if not user or user.role not in {"alumno", "docente"}:
@@ -80,15 +107,53 @@ class UserService:
             existing_carnet = self.users.find_by_carnet(carnet)
             if existing_carnet and existing_carnet.id != user.id:
                 raise ValueError("Ese carnet ya pertenece a otra cuenta.")
+        changed_fields = [
+            field for field, old, new in (
+                ("name", user.name, name),
+                ("email", user.email, email),
+                ("carnet", user.carnet, carnet or None),
+            ) if old != new and (field != "carnet" or user.role == "alumno")
+        ]
         user.name = name
         user.email = email
         if user.role == "alumno":
             user.carnet = carnet or None
+        if changed_fields:
+            AuditService.record(
+                actor_id, "profile_updated", "user", user.id,
+                {"changed_fields": changed_fields},
+            )
         try:
             return self.users.save(user)
         except IntegrityError as error:
             db.session.rollback()
             raise ValueError("El correo o carnet ya pertenece a otra cuenta.") from error
+
+    def change_password(self, user_id, current_password, new_password, confirmation):
+        user = self.users.find_by_id(user_id)
+        if not user or not user.check_password(current_password):
+            raise ValueError("La contraseña actual no es correcta.")
+        self._save_new_password(
+            user, new_password, confirmation, user.id, "password_changed"
+        )
+
+    def admin_reset_password(self, user_id, new_password, confirmation, actor_id=None):
+        user = self.users.find_by_id(user_id)
+        if not user or user.role not in {"alumno", "docente"}:
+            raise ValueError("No se encontró la cuenta académica.")
+        self._save_new_password(
+            user, new_password, confirmation, actor_id, "password_reset"
+        )
+
+    @staticmethod
+    def _save_new_password(user, new_password, confirmation, actor_id, action):
+        if not new_password:
+            raise ValueError("La nueva contraseña no puede estar vacía.")
+        if new_password != confirmation:
+            raise ValueError("La confirmación de contraseña no coincide.")
+        user.set_password(new_password)
+        AuditService.record(actor_id, action, "user", user.id)
+        db.session.commit()
 
 
 class CourseService:
@@ -107,7 +172,8 @@ class CourseService:
             raise ValueError("Ese código de curso ya está registrado.") from error
 
     def create_course_for_admin(
-        self, name, code, teacher_id, schedule, location_type, classroom, student_ids
+        self, name, code, teacher_id, schedule, location_type, classroom,
+        student_ids, actor_id=None,
     ):
         name, code = name.strip(), code.strip().upper()
         schedule, classroom = schedule.strip(), classroom.strip()
@@ -137,7 +203,18 @@ class CourseService:
             CourseEnrollment(student=student) for student in students
         ]
         try:
-            return self.courses.add(course)
+            db.session.add(course)
+            db.session.flush()
+            AuditService.record(
+                actor_id, "course_created", "course", course.id,
+                {
+                    "code": course.code,
+                    "teacher_id": teacher.id,
+                    "student_ids": sorted(student.id for student in students),
+                },
+            )
+            db.session.commit()
+            return course
         except IntegrityError as error:
             db.session.rollback()
             raise ValueError("No se pudo guardar el curso. Revisa su código.") from error
@@ -153,6 +230,7 @@ class CourseService:
         is_active=True,
         name=None,
         code=None,
+        actor_id=None,
     ):
         course = db.session.get(Course, course_id)
         if not course:
@@ -177,6 +255,16 @@ class CourseService:
         )
         if duplicate_code:
             raise ValueError("Ese código de curso ya está registrado.")
+        previous_values = {
+            "name": course.name,
+            "code": course.code,
+            "teacher_id": course.teacher_id,
+            "schedule": course.schedule,
+            "location_type": course.location_type,
+            "classroom": course.classroom,
+            "is_active": course.is_active,
+        }
+        previous_student_ids = {enrollment.student_id for enrollment in course.enrollments}
         course.name = name
         course.code = code
         course.teacher_id = teacher.id
@@ -224,17 +312,101 @@ class CourseService:
                                 source="cierre",
                             )
                         )
+            changed_fields = [
+                field for field, old_value in previous_values.items()
+                if old_value != getattr(course, field)
+            ]
+            added_student_ids = sorted(selected_ids - previous_student_ids)
+            removed_student_ids = sorted(previous_student_ids - selected_ids)
+            if changed_fields or added_student_ids or removed_student_ids:
+                AuditService.record(
+                    actor_id, "course_updated", "course", course.id,
+                    {
+                        "changed_fields": changed_fields,
+                        "added_student_ids": added_student_ids,
+                        "removed_student_ids": removed_student_ids,
+                    },
+                )
             db.session.commit()
         except IntegrityError as error:
             db.session.rollback()
             raise ValueError("No se pudieron actualizar las asignaciones.") from error
         return course
 
+    def bulk_enroll(self, enrollments, actor_id=None):
+        new_pairs = set()
+        for course_id, student_id in enrollments:
+            course = db.session.get(Course, course_id)
+            student = db.session.get(User, student_id)
+            if not course or not student or student.role != "alumno":
+                raise ValueError("Una de las matrículas seleccionadas ya no es válida.")
+            new_pairs.add((course.id, student.id))
+
+        existing_pairs = set(
+            db.session.execute(
+                select(CourseEnrollment.course_id, CourseEnrollment.student_id).where(
+                    CourseEnrollment.course_id.in_({course_id for course_id, _ in new_pairs}),
+                    CourseEnrollment.student_id.in_({student_id for _, student_id in new_pairs}),
+                )
+            ).all()
+        ) if new_pairs else set()
+        new_pairs -= existing_pairs
+        if not new_pairs:
+            return 0
+
+        try:
+            for course_id, student_id in new_pairs:
+                db.session.add(
+                    CourseEnrollment(course_id=course_id, student_id=student_id)
+                )
+                AuditService.record(
+                    actor_id, "student_enrolled", "course_enrollment", None,
+                    {"course_id": course_id, "student_id": student_id},
+                )
+
+            course_ids = {course_id for course_id, _ in new_pairs}
+            closed_sessions = db.session.scalars(
+                select(AttendanceSession).where(
+                    AttendanceSession.course_id.in_(course_ids),
+                    AttendanceSession.closed_at.is_not(None),
+                )
+            ).all()
+            sessions_by_course = {}
+            for attendance_session in closed_sessions:
+                sessions_by_course.setdefault(attendance_session.course_id, []).append(
+                    attendance_session
+                )
+            existing_attendance = set(
+                db.session.execute(
+                    select(Attendance.student_id, Attendance.session_id)
+                    .join(AttendanceSession)
+                    .where(AttendanceSession.course_id.in_(course_ids))
+                ).all()
+            )
+            for course_id, student_id in new_pairs:
+                for attendance_session in sessions_by_course.get(course_id, []):
+                    if (student_id, attendance_session.id) not in existing_attendance:
+                        db.session.add(
+                            Attendance(
+                                session_id=attendance_session.id,
+                                student_id=student_id,
+                                recorded_at=attendance_session.closed_at,
+                                status="ausente",
+                                source="cierre",
+                            )
+                        )
+            db.session.commit()
+        except IntegrityError as error:
+            db.session.rollback()
+            raise ValueError("No se pudieron guardar las matrículas.") from error
+        return len(new_pairs)
+
     @staticmethod
-    def set_course_active(course_id, is_active):
+    def set_course_active(course_id, is_active, actor_id=None):
         course = db.session.get(Course, course_id)
         if not course:
             raise ValueError("No se encontró el curso.")
+        previous_active = course.is_active
         course.is_active = bool(is_active)
         if not course.is_active:
             now = datetime.now(timezone.utc)
@@ -267,6 +439,11 @@ class CourseService:
                     )
                 attendance_session.active = False
                 attendance_session.closed_at = now
+        if previous_active != course.is_active:
+            AuditService.record(
+                actor_id, "course_availability_changed", "course", course.id,
+                {"is_active": course.is_active},
+            )
         db.session.commit()
         return course
 

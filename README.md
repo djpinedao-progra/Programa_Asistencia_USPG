@@ -24,7 +24,7 @@ Aplicación web en Python para gestionar la asistencia universitaria con cuentas
 	pip install -r requirements.txt
 	```
 
-3. Copia `.env.example` como `.env` y configura `SECRET_KEY`, `DATABASE_URL`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. Elige una contraseña no vacía; el formulario da sugerencias de seguridad sin imponer una longitud mínima.
+3. Copia `.env.example` como `.env` y configura `SECRET_KEY`, `DATABASE_URL`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. `APP_TIMEZONE` define la zona horaria que se presenta en pantalla (por defecto `America/Guatemala`); las fechas se almacenan en UTC. Elige una contraseña no vacía; el formulario da sugerencias de seguridad sin imponer una longitud mínima.
 
 4. Inicializa tablas y cuenta administradora:
 
@@ -33,7 +33,7 @@ Aplicación web en Python para gestionar la asistencia universitaria con cuentas
 	flask --app run.py seed-admin
 	```
 
-	Si actualizas una instalación anterior, ejecuta `flask --app run.py migrate-carnet` y `flask --app run.py migrate-teacher-tools`. Estas migraciones agregan campos y tablas sin eliminar los cursos o asistencias guardados. El carnet se solicita para los alumnos nuevos y las cuentas existentes pueden no tenerlo hasta completar la migración institucional.
+	Si actualizas una instalación anterior, ejecuta `flask --app run.py migrate-carnet`, `flask --app run.py migrate-teacher-tools` y `flask --app run.py migrate-audit-log`. Estas migraciones agregan campos y tablas sin eliminar los cursos o asistencias guardados. El carnet se solicita para los alumnos nuevos y las cuentas existentes pueden no tenerlo hasta completar la migración institucional.
 
 5. Inicia la aplicación:
 
@@ -55,12 +55,30 @@ Para que un teléfono alcance al servidor, ambos dispositivos deben estar en la 
 - `app/routes.py` conecta los casos de uso con la interfaz web.
 - El administrador puede revisar cuentas, carnets, cursos de cada docente y el historial global de asistencia.
 - El panel administrador incluye apartados separados para estudiantes, docentes, cursos, asistencias, reportes e historial; permite editar perfiles, habilitar cursos y filtrar registros.
+- La administración permite importar matrículas desde CSV con las columnas `course_code,carnet`; se muestra una vista previa y las filas inválidas antes de confirmar.
+- Los historiales de alumno, docente y administración se muestran en páginas de 25 registros y conservan los filtros seleccionados.
+- Cada usuario puede cambiar su contraseña desde **Seguridad**; un administrador puede restablecer la de estudiantes o docentes desde su perfil.
 - Los reportes administrativos muestran porcentajes y niveles de riesgo, con exportación PDF global, por curso o por sesión.
 - Los docentes y administradores pueden descargar los registros por curso en CSV o PDF.
 - Los QR contienen tokens aleatorios cuya huella se guarda en la base de datos; vencen a los 5 minutos, pueden renovarse desde la sesión y la restricción única impide duplicados.
+- El panel docente recuerda el último curso usado y preselecciona un curso si su día y hora coinciden con el horario actual del navegador.
+- La sesión docente indica cuándo se actualizó la lista de asistencia y permite solicitar una actualización manual.
+- La sección **Auditoría** registra correcciones de asistencia, cambios de perfil, matrículas y operaciones administrativas, con actor y fecha.
+- `backup-db` crea respaldos comprimidos y versionados; `restore-db` valida formato y esquema antes de reemplazar los datos dentro de una transacción.
 - Al cerrar una sesión, los estudiantes asignados sin registro quedan como ausentes. Cada registro conserva estado (presente, ausente o justificado), hora y origen (QR o docente).
 - Los avisos docentes quedan en el historial y aparecen en el panel del estudiante; los avisos preventivos se generan bajo 90% de asistencia y el mínimo de referencia para examen final es 80%.
 - Las contraseñas se guardan con hash, las rutas se protegen por rol y las mutaciones requieren token CSRF.
+
+## Respaldos
+
+Ejecuta los comandos desde una instalación con el esquema inicializado. La restauración reemplaza todas las filas y exige confirmación explícita:
+
+```powershell
+flask --app run.py backup-db instance/asistencia-backup.json.gz
+flask --app run.py restore-db instance/asistencia-backup.json.gz --yes
+```
+
+El respaldo contiene información personal y hashes de contraseñas. Guárdalo en un medio con acceso restringido, protégelo con cifrado del sistema o del almacenamiento y no lo compartas ni lo publiques. La restauración requiere un esquema compatible; en una base nueva, ejecuta primero las migraciones.
 
 ## Pruebas
 
@@ -69,3 +87,11 @@ pytest
 ```
 
 Las pruebas usan SQLite en memoria y no requieren un servidor MySQL.
+
+Las pruebas de navegador usan Playwright y Chromium opcionales:
+
+```powershell
+py -m pip install -r requirements-browser.txt
+py -m playwright install chromium
+py -m pytest tests/test_browser.py -q
+```

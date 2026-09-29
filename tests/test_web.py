@@ -1,11 +1,22 @@
+import gzip
+import io
+import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from app import db
-from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, User
+from app.models import (
+    Attendance,
+    AttendanceSession,
+    AuditLog,
+    Course,
+    CourseEnrollment,
+    User,
+)
 from app.repositories import CourseRepository
+from app.time_utils import local_datetime
 
 
 def create_user(name, email, role, carnet=None):
@@ -67,6 +78,8 @@ def test_teacher_qr_flow_records_student_attendance(app):
     qr_page = teacher_client.get(response.location)
     assert qr_page.status_code == 200
     assert b"data:image/png;base64," in qr_page.data
+    assert b"data-connection-status" in qr_page.data
+    assert b"data-refresh-roster" in qr_page.data
     with teacher_client.session_transaction() as teacher_session:
         token = next(iter(teacher_session["teacher_qr_tokens"].values()))
 
@@ -536,7 +549,7 @@ def test_admin_attendance_reports_and_session_pdf(app):
         db.session.flush()
         db.session.add(CourseEnrollment(course_id=course.id, student_id=student.id))
         db.session.flush()
-        now = datetime.now(timezone.utc)
+        now = datetime(2026, 9, 29, 2, 30, tzinfo=timezone.utc)
         attendance_session = AttendanceSession(
             course_id=course.id,
             token_hash="b" * 64,
@@ -559,7 +572,7 @@ def test_admin_attendance_reports_and_session_pdf(app):
         db.session.commit()
         course_id, teacher_id = course.id, teacher.id
         session_id = attendance_session.id
-        session_date = now.date().isoformat()
+        session_date = local_datetime(now).date().isoformat()
 
     client = app.test_client()
     login(client, "admin@uspg.edu")
@@ -581,7 +594,368 @@ def test_admin_attendance_reports_and_session_pdf(app):
     )
     assert history.status_code == 200
     assert b"1/1" in history.data
+    assert b"28/09/2026 \xc2\xb7 20:30" in history.data
     session_pdf = client.get(f"/admin/sesiones/{session_id}/reporte.pdf")
     assert session_pdf.status_code == 200
     assert session_pdf.mimetype == "application/pdf"
     assert session_pdf.data.startswith(b"%PDF")
+    student_client = app.test_client()
+    login(student_client, "2600403")
+    student_history = student_client.get("/alumno")
+    assert b"28/09/2026 \xc2\xb7 20:30" in student_history.data
+    teacher_client = app.test_client()
+    login(teacher_client, "docente@uspg.edu")
+    exported = teacher_client.get(f"/api/cursos/{course_id}/asistencias.csv")
+    assert b"2026-09-28T20:30:00-06:00" in exported.data
+
+
+def test_admin_imports_course_enrollments_from_csv(app):
+    with app.app_context():
+        create_user("Admin", "admin@uspg.edu", "admin")
+        teacher = create_user("Docente", "docente@uspg.edu", "docente")
+        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        course = Course(name="Programación", code="INF-101", teacher_id=teacher.id)
+        db.session.add(course)
+        db.session.flush()
+        now = datetime.now(timezone.utc)
+        closed_session = AttendanceSession(
+            course_id=course.id,
+            token_hash="c" * 64,
+            created_at=now,
+            expires_at=now,
+            active=False,
+            closed_at=now,
+        )
+        db.session.add(closed_session)
+        db.session.commit()
+        student_id = student.id
+        course_id = course.id
+        session_id = closed_session.id
+
+    client = app.test_client()
+    login(client, "admin@uspg.edu")
+    upload_page = client.get("/admin/cursos/importar")
+    template = client.get("/admin/cursos/importar/plantilla.csv")
+    assert template.mimetype == "text/csv"
+    assert b"course_code,carnet" in template.data
+    csrf_token = re.search(
+        rb'name="csrf_token" value="([^"]+)"', upload_page.data
+    ).group(1).decode()
+    preview = client.post(
+        "/admin/cursos/importar",
+        data={
+            "csrf_token": csrf_token,
+            "file": (
+                io.BytesIO(
+                    b"course_code,carnet\nINF-101,2600403\nBAD-101,2600403\nINF-101,2600403\n"
+                ),
+                "matriculas.csv",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    assert preview.status_code == 200
+    assert b"Vista previa" in preview.data
+    assert b"Curso no encontrado" in preview.data
+    assert b"Duplicado en el archivo" in preview.data
+    rejected = client.post(
+        "/admin/cursos/importar",
+        data={
+            "csrf_token": csrf_token,
+            "action": "download-errors",
+            "course_code": ["INF-101", "BAD-101", "INF-101"],
+            "carnet": ["2600403", "2600403", "2600403"],
+        },
+    )
+    assert rejected.mimetype == "text/csv"
+    assert "matriculas-rechazadas.csv" in rejected.headers["Content-Disposition"]
+    assert b"BAD-101" in rejected.data
+    assert b"Duplicado en el archivo" in rejected.data
+    with app.app_context():
+        assert db.session.scalar(select(CourseEnrollment)) is None
+
+    imported = client.post(
+        "/admin/cursos/importar",
+        data={
+            "csrf_token": csrf_token,
+            "action": "import",
+            "course_code": ["INF-101"],
+            "carnet": ["2600403"],
+        },
+    )
+    assert imported.status_code == 200
+    assert b"Se agregaron 1 matr\xc3\xadculas nuevas" in imported.data
+    with app.app_context():
+        enrollment = db.session.scalar(
+            select(CourseEnrollment).where(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.student_id == student_id,
+            )
+        )
+        historical_record = db.session.scalar(
+            select(Attendance).where(
+                Attendance.session_id == session_id,
+                Attendance.student_id == student_id,
+            )
+        )
+        assert enrollment is not None
+        assert historical_record.status == "ausente"
+        assert historical_record.source == "cierre"
+
+
+def test_users_can_change_password_and_admin_can_reset_it(app):
+    with app.app_context():
+        create_user("Admin", "admin@uspg.edu", "admin")
+        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        student_id = student.id
+
+    student_client = app.test_client()
+    login(student_client, "2600403")
+    security_page = student_client.get("/cuenta/seguridad")
+    csrf_token = re.search(
+        rb'name="csrf_token" value="([^"]+)"', security_page.data
+    ).group(1).decode()
+    wrong_current = student_client.post(
+        "/cuenta/seguridad",
+        data={
+            "csrf_token": csrf_token,
+            "current_password": "incorrecta",
+            "new_password": "clave-nueva",
+            "confirm_password": "clave-nueva",
+        },
+    )
+    assert wrong_current.status_code == 200
+    assert "La contraseña actual no es correcta".encode() in wrong_current.data
+    changed = student_client.post(
+        "/cuenta/seguridad",
+        data={
+            "csrf_token": csrf_token,
+            "current_password": "password-seguro-123",
+            "new_password": "clave-nueva",
+            "confirm_password": "clave-nueva",
+        },
+    )
+    assert changed.status_code == 302
+    with app.app_context():
+        student = db.session.get(User, student_id)
+        assert student.check_password("clave-nueva")
+        assert not student.check_password("password-seguro-123")
+
+    admin_client = app.test_client()
+    login(admin_client, "admin@uspg.edu")
+    profile = admin_client.get(f"/admin/usuarios/{student_id}/perfil")
+    csrf_token = re.search(
+        rb'name="csrf_token" value="([^"]+)"', profile.data
+    ).group(1).decode()
+    reset = admin_client.post(
+        f"/admin/usuarios/{student_id}/restablecer-contrasena",
+        data={
+            "csrf_token": csrf_token,
+            "new_password": "clave-temporal",
+            "confirm_password": "clave-temporal",
+        },
+    )
+    assert reset.status_code == 302
+    with app.app_context():
+        student = db.session.get(User, student_id)
+        assert student.check_password("clave-temporal")
+        assert not student.check_password("clave-nueva")
+
+
+def test_attendance_histories_paginate_and_keep_filters(app):
+    with app.app_context():
+        create_user("Admin", "admin@uspg.edu", "admin")
+        teacher = create_user("Docente", "docente@uspg.edu", "docente")
+        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        course = Course(name="Programación", code="INF-101", teacher_id=teacher.id)
+        db.session.add(course)
+        db.session.flush()
+        db.session.add(CourseEnrollment(course_id=course.id, student_id=student.id))
+        db.session.flush()
+        now = datetime.now(timezone.utc)
+        sessions = [
+            AttendanceSession(
+                course_id=course.id,
+                token_hash=f"{index:064x}",
+                created_at=now + timedelta(minutes=index),
+                expires_at=now,
+                active=False,
+                closed_at=now,
+            )
+            for index in range(26)
+        ]
+        db.session.add_all(sessions)
+        db.session.flush()
+        db.session.add_all(
+            [
+                Attendance(
+                    session_id=attendance_session.id,
+                    student_id=student.id,
+                    recorded_at=now + timedelta(minutes=index),
+                    status="presente",
+                )
+                for index, attendance_session in enumerate(sessions)
+            ]
+        )
+        course_id = course.id
+        db.session.commit()
+
+    student_client = app.test_client()
+    login(student_client, "2600403")
+    student_history = student_client.get("/alumno?page=2")
+    assert b"26 registros" in student_history.data
+    assert b"P\xc3\xa1gina 2 de 2" in student_history.data
+    assert b"Siguiente" not in student_history.data
+
+    teacher_client = app.test_client()
+    login(teacher_client, "docente@uspg.edu")
+    teacher_history = teacher_client.get(
+        f"/docente/historial?curso={course_id}&estado=presente&page=2"
+    )
+    assert teacher_history.status_code == 200
+    assert b"26 registros" in teacher_history.data
+    assert b"P\xc3\xa1gina 2 de 2" in teacher_history.data
+    assert f"curso={course_id}".encode() in teacher_history.data
+
+    admin_client = app.test_client()
+    login(admin_client, "admin@uspg.edu")
+    admin_history = admin_client.get(f"/admin/historial?curso={course_id}&page=2")
+    assert admin_history.status_code == 200
+    assert b"26 sesiones" in admin_history.data
+    assert b"P\xc3\xa1gina 2 de 2" in admin_history.data
+    assert f"curso={course_id}".encode() in admin_history.data
+
+
+def test_attendance_corrections_are_audited_and_admin_only(app):
+    with app.app_context():
+        admin = create_user("Admin", "admin@uspg.edu", "admin")
+        teacher = create_user("Docente", "docente@uspg.edu", "docente")
+        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        course = Course(name="Historia", code="HIS-101", teacher_id=teacher.id)
+        db.session.add(course)
+        db.session.flush()
+        now = datetime.now(timezone.utc)
+        attendance_session = AttendanceSession(
+            course_id=course.id,
+            token_hash="d" * 64,
+            created_at=now,
+            expires_at=now,
+            active=False,
+            closed_at=now,
+        )
+        db.session.add(attendance_session)
+        db.session.flush()
+        attendance = Attendance(
+            session_id=attendance_session.id,
+            student_id=student.id,
+            recorded_at=now,
+            status="ausente",
+            source="cierre",
+        )
+        db.session.add(attendance)
+        db.session.commit()
+        attendance_id, teacher_id, admin_id = attendance.id, teacher.id, admin.id
+
+    teacher_client = app.test_client()
+    login(teacher_client, "docente@uspg.edu")
+    csrf_token = re.search(
+        rb'name="csrf_token" value="([^"]+)"', teacher_client.get("/docente").data
+    ).group(1).decode()
+    correction = teacher_client.post(
+        f"/docente/historial/{attendance_id}",
+        data={"csrf_token": csrf_token, "status": "presente"},
+    )
+    assert correction.status_code == 302
+
+    with app.app_context():
+        entry = db.session.scalar(select(AuditLog))
+        assert entry.actor_id == teacher_id
+        assert entry.action == "attendance_corrected"
+        assert entry.details["previous_status"] == "ausente"
+        assert entry.details["status"] == "presente"
+
+    admin_client = app.test_client()
+    login(admin_client, "admin@uspg.edu")
+    audit_page = admin_client.get("/admin/auditoria")
+    assert audit_page.status_code == 200
+    assert b"Attendance corrected" in audit_page.data
+    assert b"previous_status" in audit_page.data
+    student_client = app.test_client()
+    login(student_client, "2600403")
+    assert student_client.get("/admin/auditoria").status_code == 403
+    assert admin_id
+
+
+def test_admin_user_creation_is_audited_in_the_same_flow(app):
+    with app.app_context():
+        admin = create_user("Admin", "admin@uspg.edu", "admin")
+        admin_id = admin.id
+
+    client = app.test_client()
+    login(client, "admin@uspg.edu")
+    dashboard = client.get("/admin")
+    csrf_token = re.search(
+        rb'name="csrf_token" value="([^"]+)"', dashboard.data
+    ).group(1).decode()
+    created = client.post(
+        "/admin",
+        data={
+            "csrf_token": csrf_token,
+            "name": "Nuevo Docente",
+            "email": "nuevo@uspg.edu",
+            "password": "clave-inicial",
+            "role": "docente",
+        },
+    )
+    assert created.status_code == 302
+    with app.app_context():
+        user = db.session.scalar(select(User).where(User.email == "nuevo@uspg.edu"))
+        entry = db.session.scalar(
+            select(AuditLog).where(AuditLog.action == "user_created")
+        )
+        assert user is not None
+        assert entry.actor_id == admin_id
+        assert entry.entity_id == user.id
+        assert entry.details == {"role": "docente"}
+
+
+def test_database_backup_and_restore_round_trip(app, tmp_path):
+    with app.app_context():
+        create_user("Admin", "admin@uspg.edu", "admin")
+    backup_path = tmp_path / "asistencia-backup.json.gz"
+    runner = app.test_cli_runner()
+    backed_up = runner.invoke(args=["backup-db", str(backup_path)])
+    assert backed_up.exit_code == 0, backed_up.output
+    assert backup_path.exists()
+
+    with app.app_context():
+        create_user("Nuevo", "nuevo@uspg.edu", "docente")
+        assert len(db.session.scalars(select(User)).all()) == 2
+
+    restored = runner.invoke(args=["restore-db", str(backup_path), "--yes"])
+    assert restored.exit_code == 0, restored.output
+    with app.app_context():
+        users = db.session.scalars(select(User)).all()
+        assert [user.email for user in users] == ["admin@uspg.edu"]
+
+    incompatible_path = tmp_path / "incompatible.json.gz"
+    with gzip.open(incompatible_path, "wt", encoding="utf-8") as archive:
+        json.dump({"format": "different-program", "version": 1}, archive)
+    rejected = runner.invoke(
+        args=["restore-db", str(incompatible_path), "--yes"]
+    )
+    assert rejected.exit_code != 0
+    with app.app_context():
+        users = db.session.scalars(select(User)).all()
+        assert [user.email for user in users] == ["admin@uspg.edu"]
+
+
+def test_audit_migration_adds_table_to_existing_schema(app):
+    with app.app_context():
+        db.metadata.drop_all(bind=db.engine, tables=[AuditLog.__table__])
+        assert "audit_log" not in inspect(db.engine).get_table_names()
+
+    migration = app.test_cli_runner().invoke(args=["migrate-audit-log"])
+    assert migration.exit_code == 0, migration.output
+    with app.app_context():
+        assert "audit_log" in inspect(db.engine).get_table_names()

@@ -21,6 +21,7 @@
     <div class="topbar-user">
       <span class="user-name">{{ current_user.name }}</span>
       <span class="role-label">{{ {'admin': 'Administrador', 'docente': 'Docente', 'alumno': 'Alumno'}[current_user.role] }}</span>
+      <a class="text-link" href="{{ url_for('main.account_security') }}">Seguridad</a>
       <form method="post" action="{{ url_for('main.logout') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="icon-button" type="submit" aria-label="Cerrar sesión" title="Cerrar sesión">

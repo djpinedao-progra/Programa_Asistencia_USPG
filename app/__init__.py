@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from datetime import datetime, timezone
 
 import click
@@ -25,12 +26,20 @@ def create_app(test_config=None):
         SESSION_COOKIE_SAMESITE="Lax",
         QR_SESSION_MINUTES=5,
         APP_BASE_URL=os.getenv("APP_BASE_URL", "").rstrip("/"),
+        APP_TIMEZONE=os.getenv("APP_TIMEZONE", "America/Guatemala"),
     )
     if test_config:
         app.config.update(test_config)
 
     db.init_app(app)
     login_manager.init_app(app)
+
+    from app.time_utils import local_datetime
+
+    app.add_template_filter(
+        lambda value: local_datetime(value, app.config["APP_TIMEZONE"]),
+        "localtime",
+    )
 
     from app import models
     from app.routes import main
@@ -57,7 +66,10 @@ def create_app(test_config=None):
     def inject_template_helpers():
         from app.routes import csrf_token
 
-        return {"csrf_token": csrf_token, "current_year": datetime.now(timezone.utc).year}
+        return {
+            "csrf_token": csrf_token,
+            "current_year": datetime.now(timezone.utc).year,
+        }
 
     @app.cli.command("init-db")
     def init_db_command():
@@ -124,6 +136,46 @@ def create_app(test_config=None):
                 {"now": datetime.now(timezone.utc).replace(tzinfo=None)},
             )
         click.echo("Herramientas docentes listas; los datos existentes se conservaron.")
+
+    @app.cli.command("migrate-audit-log")
+    def migrate_audit_log_command():
+        """Create the audit log table for existing installations."""
+        db.create_all()
+        click.echo("Tabla de auditoría lista.")
+
+    @app.cli.command("backup-db")
+    @click.argument("destination", type=click.Path(path_type=Path, dir_okay=False))
+    def backup_db_command(destination):
+        """Create a compressed, versioned backup of application data."""
+        from app.backup import create_backup
+
+        try:
+            table_count, row_count = create_backup(destination)
+        except (OSError, ValueError) as error:
+            raise click.ClickException(str(error)) from error
+        click.echo(
+            f"Respaldo creado: {destination} ({row_count} filas en {table_count} tablas)."
+        )
+
+    @app.cli.command("restore-db")
+    @click.argument("source", type=click.Path(path_type=Path, exists=True, dir_okay=False))
+    @click.option("--yes", is_flag=True, help="Confirma sin mostrar el diálogo interactivo.")
+    def restore_db_command(source, yes):
+        """Replace application data using a compatible backup."""
+        if not yes:
+            click.confirm(
+                "Esta operación reemplazará todos los datos actuales. ¿Continuar?",
+                abort=True,
+            )
+        from app.backup import restore_backup
+
+        try:
+            table_count, row_count = restore_backup(source)
+        except (OSError, ValueError) as error:
+            raise click.ClickException(str(error)) from error
+        click.echo(
+            f"Restauración completada: {row_count} filas en {table_count} tablas."
+        )
 
     @app.cli.command("seed-admin")
     def seed_admin_command():

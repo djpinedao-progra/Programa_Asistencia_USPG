@@ -138,6 +138,13 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .session-heading { align-items: center; margin-bottom: 25px; }
 .live-label { display: inline-flex; align-items: center; gap: 8px; color: var(--teal); font-size: 10px; font-weight: 800; letter-spacing: .1em; }
 .live-label span { box-shadow: 0 0 0 4px rgba(181, 18, 43, .12); }
+.session-sync-controls { display: flex; align-items: center; gap: 12px; }
+.session-connection-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.session-connection-status::before { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); content: ""; }
+.session-connection-status[data-state="online"] { color: var(--present-ink); }
+.session-connection-status[data-state="online"]::before { background: var(--present-ink); }
+.session-connection-status[data-state="offline"] { color: var(--absence-ink); }
+.session-connection-status[data-state="offline"]::before { background: var(--absence-ink); }
 .live-label.is-expired { color: var(--coral); }
 .live-label.is-expired span { background: var(--coral); box-shadow: 0 0 0 4px rgba(223, 116, 90, .15); }
 .session-layout { display: grid; grid-template-columns: minmax(270px, .8fr) minmax(0, 1.2fr); border-top: 1px solid var(--line); }
@@ -335,6 +342,8 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .teacher-filter-section { border-top: 0; padding-top: 0; }
 .teacher-filter-form { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
 .history-filter-form { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)) auto auto; align-items: end; gap: 10px; margin-bottom: 20px; }
+.pagination-controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; color: var(--muted); font-size: 12px; }
+.pagination-controls > div { display: flex; gap: 8px; }
 .history-filter-form label { display: grid; gap: 5px; color: var(--ink-soft); font-size: 10px; font-weight: 700; }
 .inline-notice-form { display: inline; }
 .table-secondary { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; }

@@ -1,4 +1,51 @@
 (() => {
+  const attendanceForm = document.querySelector(".start-attendance-form[data-teacher-id]");
+  if (attendanceForm) {
+    const courseSelect = attendanceForm.querySelector("#attendance-course");
+    const suggestion = attendanceForm.querySelector("[data-course-suggestion]");
+    const storageKey = `attendance-course-${attendanceForm.dataset.teacherId}`;
+    const dayNames = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+    const today = dayNames[new Date().getDay()];
+    const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+    const normalize = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-GT");
+    let scheduledCourse = null;
+
+    [...courseSelect.options].slice(1).forEach((option) => {
+      const schedule = normalize(option.dataset.courseSchedule || "");
+      if (!new RegExp(`\\b${today}\\b`).test(schedule)) return;
+      const times = [...schedule.matchAll(/\b(\d{1,2}):(\d{2})\b/g)]
+        .map((match) => Number(match[1]) * 60 + Number(match[2]));
+      if (times.length >= 2 && currentMinutes >= times[0] && currentMinutes <= times[1]) {
+        scheduledCourse = option;
+      }
+    });
+
+    let previousCourse = "";
+    try {
+      previousCourse = window.localStorage.getItem(storageKey) || "";
+    } catch (_) {
+      // Course selection still works when browser storage is unavailable.
+    }
+    const rememberedOption = [...courseSelect.options].find((option) => option.value === previousCourse);
+    if (scheduledCourse) {
+      courseSelect.value = scheduledCourse.value;
+      suggestion.textContent = `Seleccionado por el horario de hoy: ${scheduledCourse.textContent.trim()}.`;
+      suggestion.hidden = false;
+    } else if (rememberedOption) {
+      courseSelect.value = rememberedOption.value;
+      suggestion.textContent = "Se conservó el último curso seleccionado.";
+      suggestion.hidden = false;
+    }
+    courseSelect.addEventListener("change", () => {
+      try {
+        if (courseSelect.value) window.localStorage.setItem(storageKey, courseSelect.value);
+        else window.localStorage.removeItem(storageKey);
+      } catch (_) {
+        // The selected course remains usable even when browser storage is unavailable.
+      }
+    });
+  }
+
   const passwordInput = document.querySelector("[data-password-input]");
   const meter = document.querySelector("[data-password-meter]");
   if (passwordInput && meter) {
@@ -37,17 +84,40 @@
     const roster = liveSession.querySelector("[data-attendance-list]");
     const search = liveSession.querySelector("[data-student-search]");
     const countdown = liveSession.querySelector("[data-qr-countdown]");
+    const connectionStatus = liveSession.querySelector("[data-connection-status]");
+    const refreshButton = liveSession.querySelector("[data-refresh-roster]");
+    let refreshInProgress = false;
+    let lastUpdatedAt = null;
+    const updateConnectionStatus = (online) => {
+      if (!connectionStatus) return;
+      connectionStatus.dataset.state = online ? "online" : "offline";
+      if (online) {
+        lastUpdatedAt = new Date();
+        connectionStatus.textContent = `Conectado · ${lastUpdatedAt.toLocaleTimeString("es-GT", { timeZone: "America/Guatemala", hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+      } else {
+        const lastUpdate = lastUpdatedAt
+          ? ` · último dato ${lastUpdatedAt.toLocaleTimeString("es-GT", { timeZone: "America/Guatemala", hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+          : "";
+        connectionStatus.textContent = `Sin conexión · reintentando${lastUpdate}`;
+      }
+    };
     const formatTimestamp = (value) => {
       if (!value) return "Sin registro";
       const date = new Date(value);
-      return `${date.toLocaleDateString("es-GT")} · ${date.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
+      return `${date.toLocaleDateString("es-GT", { timeZone: "America/Guatemala" })} · ${date.toLocaleTimeString("es-GT", { timeZone: "America/Guatemala", hour: "2-digit", minute: "2-digit" })}`;
     };
     const updateRoster = async () => {
+      if (refreshInProgress) return;
+      refreshInProgress = true;
+      if (refreshButton) refreshButton.disabled = true;
       try {
         const response = await fetch(liveSession.dataset.statusUrl, {
           headers: { Accept: "application/json" },
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          updateConnectionStatus(false);
+          return;
+        }
         const state = await response.json();
         state.students.forEach((student) => {
           const row = roster.querySelector(`[data-student-id="${student.id}"]`);
@@ -65,10 +135,15 @@
         });
         const count = liveSession.querySelector("[data-present-count]");
         if (count) count.textContent = state.present_count;
+        updateConnectionStatus(true);
       } catch (_) {
-        // The roster refresh is best-effort while the teacher keeps the page open.
+        updateConnectionStatus(false);
+      } finally {
+        refreshInProgress = false;
+        if (refreshButton) refreshButton.disabled = false;
       }
     };
+    refreshButton?.addEventListener("click", updateRoster);
     search?.addEventListener("input", () => {
       const query = search.value.trim().toLocaleLowerCase();
       roster.querySelectorAll("[data-student-id]").forEach((row) => {
