@@ -9,17 +9,17 @@
   --brand-tint-soft: #fff5f6;
   --on-brand: #ffffff;
 
-  --canvas: #f7f3f4;
-  --surface: #ffffff;
-  --surface-2: #faf6f7;
-  --surface-hover: #fdf5f6;
+  --canvas: #ffffff;
+  --surface: #f3f4f6;
+  --surface-2: #eceef1;
+  --surface-hover: #e9ebee;
   --input-bg: #ffffff;
-  --ink: #292324;
-  --ink-soft: #51484a;
-  --muted: #776c6e;
-  --line: #ece2e4;
-  --line-strong: #dcccd0;
-  --track: #f0e6e8;
+  --ink: #1f2329;
+  --ink-soft: #4b5260;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --track: #e2e5ea;
   --qr-bg: #ffffff;
 
   --present: #e7f4ec;
@@ -31,8 +31,8 @@
   --watch: #fff3d8;
   --watch-ink: #845b10;
   --watch-fill: #c58a24;
-  --neutral: #f2eded;
-  --neutral-ink: #6f6466;
+  --neutral: #e5e7eb;
+  --neutral-ink: #4b5563;
 
   --sidebar-bg: linear-gradient(180deg, #98112b 0%, #810d20 52%, #6a0a1a 100%);
   --sidebar-border: transparent;
@@ -47,8 +47,8 @@
 
   --radius-control: 9px;
   --radius-card: 13px;
-  --shadow-sm: 0 1px 2px rgba(56, 24, 30, .05), 0 6px 18px rgba(56, 24, 30, .05);
-  --shadow-hover: 0 10px 26px rgba(75, 10, 20, .11);
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, .04);
+  --shadow-hover: 0 8px 22px rgba(17, 24, 39, .08);
   --button-shadow: 0 1px 2px rgba(70, 12, 24, .12);
   --focus-ring: 0 0 0 3px rgba(181, 18, 43, .2);
 
@@ -66,17 +66,17 @@
   --accent-text: #f26b7f;
   --brand-tint: rgba(200, 33, 59, .18);
   --brand-tint-soft: rgba(200, 33, 59, .09);
-  --canvas: #121012;
-  --surface: #1c1719;
-  --surface-2: #231d1f;
-  --surface-hover: #262022;
-  --input-bg: #161214;
-  --ink: #f6f0f1;
-  --ink-soft: #d8ced0;
-  --muted: #a89c9f;
-  --line: #342a2d;
-  --line-strong: #4a3c40;
-  --track: #362c2f;
+  --canvas: #18191c;
+  --surface: #26282d;
+  --surface-2: #2d3036;
+  --surface-hover: #303339;
+  --input-bg: #1d1f23;
+  --ink: #f3f4f6;
+  --ink-soft: #d1d5db;
+  --muted: #9ca3af;
+  --line: #34373d;
+  --line-strong: #464a52;
+  --track: #3a3d44;
   --present: rgba(63, 165, 105, .17);
   --present-ink: #82d8a5;
   --present-fill: #4fb37a;
@@ -86,8 +86,8 @@
   --watch: rgba(222, 166, 58, .17);
   --watch-ink: #f2c46b;
   --watch-fill: #dca13a;
-  --neutral: rgba(255, 255, 255, .07);
-  --neutral-ink: #c4b8bb;
+  --neutral: rgba(255, 255, 255, .09);
+  --neutral-ink: #c9cdd3;
   --sidebar-bg: linear-gradient(180deg, #3b0f19 0%, #2a0a12 55%, #1d070d 100%);
   --sidebar-border: rgba(255, 255, 255, .06);
   --sidebar-link: rgba(255, 255, 255, .78);
@@ -97,7 +97,7 @@
   --sidebar-active-ink: #ffffff;
   --sidebar-divider: rgba(255, 255, 255, .1);
   --hero-bg: linear-gradient(150deg, #3d0f1a 0%, #1f080e 100%);
-  --topbar-bg: rgba(28, 23, 25, .9);
+  --topbar-bg: rgba(24, 25, 28, .9);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .22);
   --shadow-hover: 0 12px 30px rgba(0, 0, 0, .45);
   --button-shadow: 0 1px 2px rgba(0, 0, 0, .4);
@@ -113,17 +113,17 @@
     --accent-text: #f26b7f;
     --brand-tint: rgba(200, 33, 59, .18);
     --brand-tint-soft: rgba(200, 33, 59, .09);
-    --canvas: #121012;
-    --surface: #1c1719;
-    --surface-2: #231d1f;
-    --surface-hover: #262022;
-    --input-bg: #161214;
-    --ink: #f6f0f1;
-    --ink-soft: #d8ced0;
-    --muted: #a89c9f;
-    --line: #342a2d;
-    --line-strong: #4a3c40;
-    --track: #362c2f;
+    --canvas: #18191c;
+    --surface: #26282d;
+    --surface-2: #2d3036;
+    --surface-hover: #303339;
+    --input-bg: #1d1f23;
+    --ink: #f3f4f6;
+    --ink-soft: #d1d5db;
+    --muted: #9ca3af;
+    --line: #34373d;
+    --line-strong: #464a52;
+    --track: #3a3d44;
     --present: rgba(63, 165, 105, .17);
     --present-ink: #82d8a5;
     --present-fill: #4fb37a;
@@ -133,8 +133,8 @@
     --watch: rgba(222, 166, 58, .17);
     --watch-ink: #f2c46b;
     --watch-fill: #dca13a;
-    --neutral: rgba(255, 255, 255, .07);
-    --neutral-ink: #c4b8bb;
+    --neutral: rgba(255, 255, 255, .09);
+    --neutral-ink: #c9cdd3;
     --sidebar-bg: linear-gradient(180deg, #3b0f19 0%, #2a0a12 55%, #1d070d 100%);
     --sidebar-border: rgba(255, 255, 255, .06);
     --sidebar-link: rgba(255, 255, 255, .78);
@@ -144,7 +144,7 @@
     --sidebar-active-ink: #ffffff;
     --sidebar-divider: rgba(255, 255, 255, .1);
     --hero-bg: linear-gradient(150deg, #3d0f1a 0%, #1f080e 100%);
-    --topbar-bg: rgba(28, 23, 25, .9);
+    --topbar-bg: rgba(24, 25, 28, .9);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .22);
     --shadow-hover: 0 12px 30px rgba(0, 0, 0, .45);
     --button-shadow: 0 1px 2px rgba(0, 0, 0, .4);

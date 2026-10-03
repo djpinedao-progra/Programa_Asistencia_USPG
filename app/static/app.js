@@ -42,8 +42,12 @@
     link.setAttribute("aria-current", "page");
   };
   const samePageLinks = navLinks.filter((link) => link.pathname === window.location.pathname);
-  const hashLink = samePageLinks.find((link) => link.hash && link.hash === window.location.hash);
-  if (hashLink) markCurrentLink(hashLink);
+  const markLinkFromHash = () => {
+    const hashLink = samePageLinks.find((link) => link.hash && link.hash === window.location.hash);
+    if (hashLink) markCurrentLink(hashLink);
+  };
+  markLinkFromHash();
+  window.addEventListener("hashchange", markLinkFromHash);
   samePageLinks.forEach((link) => link.addEventListener("click", () => markCurrentLink(link)));
 
   const attendanceForm =document.querySelector(".start-attendance-form[data-teacher-id]");
