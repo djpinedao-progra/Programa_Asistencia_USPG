@@ -33,6 +33,20 @@ Aplicación web en Python para gestionar la asistencia universitaria con cuentas
 	flask --app run.py seed-admin
 	```
 
+	Para que todo el equipo tenga las mismas cuentas de prueba, ejecuta también:
+
+	```powershell
+	flask --app run.py seed-test-users
+	```
+
+	| Rol | Usuario | Contraseña |
+	| --- | --- | --- |
+	| Administrador | admin@uspg.edu | 123 |
+	| Docente | docente@uspg.edu | 123 |
+	| Alumno | alumno@uspg.edu (carnet 2600001) | 123 |
+
+	El comando crea las cuentas que falten y vuelve a poner la contraseña `123` en las que ya existan. Son solo para desarrollo: no lo ejecutes en un servidor público.
+
 	Si actualizas una instalación anterior, ejecuta `flask --app run.py migrate-carnet`, `flask --app run.py migrate-teacher-tools` y `flask --app run.py migrate-audit-log`. Estas migraciones agregan campos y tablas sin eliminar los cursos o asistencias guardados. El carnet se solicita para los alumnos nuevos y las cuentas existentes pueden no tenerlo hasta completar la migración institucional.
 
 5. Inicia la aplicación:
