@@ -1,29 +1,22 @@
 {% extends "base.html" %}
+{% from "_attendance.html" import pct_level %}
 {% block title %}Inicio del estudiante{% endblock %}
 {% block head %}<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>{% endblock %}
 {% block content %}
-<nav class="student-nav" aria-label="Apartados del estudiante">
-  <a href="#inicio">Inicio</a><a href="#mi-asistencia">Mi asistencia</a><a href="#mis-cursos">Mis cursos</a><a href="#avisos">Avisos{% if notices %}<span>{{ notices|length }}</span>{% endif %}</a>
-</nav>
-<section class="student-home" id="inicio">
-  <div class="student-welcome">
-    <p class="eyebrow">ESPACIO DEL ALUMNO</p><h1>Hola, {{ current_user.name.split()[0] }}</h1>
-    <p>Este es tu resumen académico. Revisa tu asistencia y mantente al día en tus cursos.</p>
-    <a class="button button-light" href="#mis-cursos">Ver mis cursos <span aria-hidden="true">→</span></a>
-  </div>
-  <div class="student-overview" aria-label="Resumen general">
-    <div><span>Asistencia general</span><strong>{{ overall_percentage }}<small>%</small></strong><small>{{ total_attended }} presentes de {{ total_sessions }} sesiones</small></div>
-    <div><span>Cursos registrados</span><strong>{{ courses|length }}</strong><small>con asistencia registrada</small></div>
-    <div><span>Faltas estimadas</span><strong>{{ total_absences }}</strong><small>en sesiones impartidas</small></div>
-  </div>
+<div class="page-heading" id="inicio"><div><p class="eyebrow">ESPACIO DEL ALUMNO</p><h1>Hola, {{ current_user.name.split()[0] }}</h1><p class="muted">Este es tu resumen académico. Revisa tu asistencia y mantente al día en tus cursos.</p></div><a class="button button-primary" href="#mis-cursos">Ver mis cursos <span aria-hidden="true">→</span></a></div>
+<section class="stat-grid stat-grid-3" aria-label="Resumen general">
+  {% set overall_level = pct_level(overall_percentage) if total_sessions else 'good' %}
+  <div class="stat-card"><span class="stat-label">Asistencia general</span><strong class="stat-value">{{ overall_percentage }}<small>%</small></strong><div class="stat-progress stat-progress-{{ overall_level }}" role="img" aria-label="{{ overall_percentage }} por ciento de asistencia"><span style="width: {{ overall_percentage }}%"></span></div><small class="stat-note">{{ total_attended }} presentes de {{ total_sessions }} sesiones</small></div>
+  <div class="stat-card"><span class="stat-label">Cursos registrados</span><strong class="stat-value">{{ courses|length }}</strong><small class="stat-note">con asistencia registrada</small></div>
+  <div class="stat-card"><span class="stat-label">Faltas estimadas</span><strong class="stat-value">{{ total_absences }}</strong><small class="stat-note">en sesiones impartidas</small></div>
 </section>
 
 <section class="student-section" id="mi-asistencia">
   <div class="section-heading"><div><p class="eyebrow">SEGUIMIENTO</p><h2>Mi asistencia</h2></div><span class="section-number">{{ total_sessions }} sesiones</span></div>
   <div class="student-attendance-layout">
     <div class="attendance-chart-block">
-      <div class="attendance-donut" role="img" aria-label="{{ overall_percentage }} por ciento de asistencia y {{ 100 - overall_percentage }} por ciento de faltas" style="--attendance-rate: {{ overall_percentage }}%"><div><strong>{{ overall_percentage }}%</strong><span>asistencia</span></div></div>
-      <div class="chart-legend"><span><i class="legend-present"></i>Asistencias <strong>{{ total_attended }}</strong></span><span><i class="legend-absence"></i>Faltas <strong>{{ total_absences }}</strong></span></div>
+      <div class="attendance-donut attendance-donut-{{ overall_level }}" role="img" aria-label="{{ overall_percentage }} por ciento de asistencia y {{ 100 - overall_percentage }} por ciento de faltas" style="--attendance-rate: {{ overall_percentage }}%"><div><strong>{{ overall_percentage }}%</strong><span>asistencia</span></div></div>
+      <div class="chart-legend"><span><i class="legend-present legend-{{ overall_level }}"></i>Asistencias <strong>{{ total_attended }}</strong></span><span><i class="legend-absence"></i>Faltas <strong>{{ total_absences }}</strong></span></div>
     </div>
     <div class="attendance-summary">
       {% if overall_percentage < 80 and total_sessions %}
@@ -50,7 +43,7 @@
   <div class="student-course-grid">
   {% for course in courses %}
     <article class="student-course" data-course-progress="{{ course.percentage }}">
-      <div class="student-course-top"><div><p class="eyebrow">{{ course.course.code }}</p><h3>{{ course.course.name }}</h3><span>Docente: {{ course.course.teacher.name }}</span></div><strong class="course-rate {% if course.percentage < 80 %}rate-risk{% elif course.percentage < 90 %}rate-warning{% endif %}">{{ course.percentage }}%</strong></div>
+      <div class="student-course-top"><div><p class="eyebrow">{{ course.course.code }}</p><h3>{{ course.course.name }}</h3><span>Docente: {{ course.course.teacher.name }}</span></div><strong class="course-rate rate-{{ pct_level(course.percentage) }}">{{ course.percentage }}%</strong></div>
       <div class="course-progress-track" role="img" aria-label="{{ course.percentage }} por ciento de asistencia"><span style="width: {{ course.percentage }}%"></span></div>
       <div class="course-stats"><span><strong>{{ course.attended_count }}</strong> asistencias</span><span><strong>{{ course.absence_count }}</strong> faltas</span><span>{{ course.total_sessions }} sesiones</span></div>
       <details class="course-attendance-detail"><summary>Ver asistencias del curso</summary>
@@ -76,7 +69,7 @@
 <section class="student-section student-history" id="historial">
   <div class="section-heading"><div><p class="eyebrow">REGISTROS</p><h2>Historial de asistencias</h2></div><span class="section-number">{{ history_total }} registros</span></div>
   <div class="table-wrap"><table><thead><tr><th>Curso</th><th>Código</th><th>Estado</th><th>Fecha</th><th>Hora</th></tr></thead><tbody>
-    {% for attendance in history_attendances %}<tr><td class="primary-cell" data-label="Curso">{{ attendance.session.course.name }}</td><td data-label="Código">{{ attendance.session.course.code }}</td><td data-label="Estado">{{ attendance.status|capitalize }}</td><td data-label="Fecha">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y') }}</td><td data-label="Hora"><span class="time-cell">{{ (attendance.recorded_at|localtime).strftime('%H:%M') }}</span></td></tr>
+    {% for attendance in history_attendances %}<tr><td class="primary-cell" data-label="Curso">{{ attendance.session.course.name }}</td><td data-label="Código">{{ attendance.session.course.code }}</td><td data-label="Estado"><span class="session-state state-{{ attendance.status }}">{{ attendance.status|capitalize }}</span></td><td data-label="Fecha">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y') }}</td><td data-label="Hora"><span class="time-cell">{{ (attendance.recorded_at|localtime).strftime('%H:%M') }}</span></td></tr>
     {% else %}<tr><td colspan="5" class="empty-cell">Tu historial de asistencia aparecerá aquí.</td></tr>{% endfor %}
   </tbody></table></div>
   <nav class="pagination-controls" aria-label="Paginación del historial"><span>{{ history_attendances|length }} de {{ history_total }} registros · Página {{ history_page }} de {{ history_pages }}</span><div>{% if history_page > 1 %}<a class="button button-outline button-small" href="{{ url_for('main.student_dashboard', page=history_page - 1) }}#historial">Anterior</a>{% endif %}{% if history_page < history_pages %}<a class="button button-outline button-small" href="{{ url_for('main.student_dashboard', page=history_page + 1) }}#historial">Siguiente</a>{% endif %}</div></nav>

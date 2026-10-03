@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Perfil · Administración{% endblock %}
 {% block content %}
-{% include "admin_nav.html" %}
 <a class="back-link" href="{{ url_for('main.admin_students' if user.role == 'alumno' else 'main.admin_teachers') }}">← Volver al listado</a>
 <div class="page-heading"><div><p class="eyebrow">PERFIL {{ 'ESTUDIANTIL' if user.role == 'alumno' else 'DOCENTE' }}</p><h1>{{ user.name }}</h1><p class="muted">Cuenta creada {{ (user.created_at|localtime).strftime('%d/%m/%Y') if user.created_at else '—' }}</p></div></div>
 <div class="admin-profile-grid"><form method="post" class="panel form-panel stack-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label for="profile-name">Nombre completo</label><input id="profile-name" name="name" value="{{ user.name }}" required><label for="profile-email">Correo institucional</label><input id="profile-email" name="email" type="email" value="{{ user.email }}" required>{% if user.role == 'alumno' %}<label for="profile-carnet">Carnet</label><input id="profile-carnet" name="carnet" inputmode="numeric" pattern="[0-9]{7}" value="{{ user.carnet or '' }}" placeholder="Siete dígitos">{% endif %}<button class="button button-primary" type="submit">Guardar perfil</button></form>

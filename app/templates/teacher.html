@@ -1,17 +1,15 @@
 {% extends "base.html" %}
+{% from "_attendance.html" import pct_level %}
 {% block title %}Inicio docente{% endblock %}
 {% block content %}
-<nav class="teacher-nav" aria-label="Apartados docentes"><a href="#inicio">Inicio</a><a href="#mis-cursos">Mis cursos</a><a href="#tomar-asistencia">Tomar asistencia</a><a href="{{ url_for('main.teacher_history') }}">Historial</a><a href="{{ url_for('main.teacher_students') }}">Estudiantes</a><a href="#avisos">Avisos</a></nav>
-<section class="teacher-home" id="inicio">
-  <div class="teacher-welcome"><p class="eyebrow">ESPACIO DOCENTE</p><h1>Hola, {{ current_user.name.split()[0] }}</h1><p>Resumen de tus cursos y actividad académica.</p><a class="button button-light" href="#tomar-asistencia">Tomar asistencia <span aria-hidden="true">→</span></a></div>
-  <div class="teacher-overview"><div><span>Cursos a cargo</span><strong>{{ courses|length }}</strong></div><div><span>Estudiantes asignados</span><strong>{{ total_enrollments }}</strong></div><div><span>Sesiones realizadas</span><strong>{{ total_sessions }}</strong></div><div><span>Estudiantes bajo 80%</span><strong>{{ students_below_80 }}</strong></div></div>
-</section>
+<div class="page-heading" id="inicio"><div><p class="eyebrow">ESPACIO DOCENTE</p><h1>Hola, {{ current_user.name.split()[0] }}</h1><p class="muted">Resumen de tus cursos y actividad académica.</p></div><a class="button button-primary" href="#tomar-asistencia">Tomar asistencia <span aria-hidden="true">→</span></a></div>
+<section class="stat-grid" aria-label="Resumen docente"><div class="stat-card"><span class="stat-label">Cursos a cargo</span><strong class="stat-value">{{ courses|length }}</strong><small class="stat-note">Asignados</small></div><div class="stat-card"><span class="stat-label">Estudiantes asignados</span><strong class="stat-value">{{ total_enrollments }}</strong><small class="stat-note">En todos tus cursos</small></div><div class="stat-card"><span class="stat-label">Sesiones realizadas</span><strong class="stat-value">{{ total_sessions }}</strong><small class="stat-note">Registradas</small></div><div class="stat-card {% if students_below_80 %}is-risk{% endif %}"><span class="stat-label">Estudiantes bajo 80%</span><strong class="stat-value">{{ students_below_80 }}</strong><small class="stat-note">Requieren atención</small></div></section>
 
 <section class="teacher-section" id="mis-cursos">
   <div class="section-heading"><div><p class="eyebrow">PLANIFICACIÓN</p><h2>Mis cursos</h2></div><span class="section-number">{{ courses|length }} asignados</span></div>
   <div class="teacher-course-grid">
   {% for item in course_metrics %}{% set course = item.course %}
-    <article class="teacher-course-card"><div class="teacher-course-title"><div><p class="eyebrow">{{ course.code }}</p><h3>{{ course.name }}</h3></div><strong>{{ item.average_percentage }}%</strong></div>
+    <article class="teacher-course-card"><div class="teacher-course-title"><div><p class="eyebrow">{{ course.code }}</p><h3>{{ course.name }}</h3></div><strong class="course-rate rate-{{ pct_level(item.average_percentage) }}">{{ item.average_percentage }}%</strong></div>
       <div class="teacher-course-facts"><span><b>{{ item.student_count }}</b> estudiantes</span><span><b>{{ item.sessions_count }}</b> sesiones</span><span><b>{{ item.below_80 }}</b> bajo 80%</span></div>
       <div class="teacher-course-meta"><span><b>Horario</b>{{ course.schedule or 'Pendiente de asignar' }}</span><span><b>Modalidad</b>{{ 'Virtual' if course.location_type == 'virtual' else 'Presencial' }} · {{ course.classroom or 'Salón pendiente' }}</span></div>
       <a class="button button-outline button-small" href="{{ url_for('main.teacher_course', course_id=course.id) }}">Ver Curso <span aria-hidden="true">→</span></a>
@@ -31,7 +29,7 @@
     <div class="notice-history"><h3>Enviados recientemente</h3>{% for notice in notice_history %}<article><span class="notice-kind">{{ {'automatic': 'Asistencia baja', 'broadcast': 'Curso completo', 'manual': 'Personal'}[notice.kind] }}</span><strong>{{ notice.course.code }}{% if notice.student %} · {{ notice.student.name }}{% else %} · Todo el curso{% endif %}</strong><p>{{ notice.message }}</p><time>{{ (notice.created_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></article>{% else %}<p class="muted">Todavía no has enviado avisos.</p>{% endfor %}</div>
   </div>
   <div class="automatic-alerts"><h3>Observación automática · menos de 90%</h3>
-    {% for item in course_metrics %}{% for row in item.students if row.percentage < 90 %}<article class="automatic-alert {% if row.percentage < 80 %}automatic-alert-risk{% endif %}"><span>{{ row.percentage }}%</span><div><strong>{{ row.student.name }} · {{ item.course.code }}</strong><p>{{ row.absent }} faltas · El mínimo requerido para examen final es 80%.</p></div></article>{% endfor %}{% endfor %}
+    {% for item in course_metrics %}{% for row in item.students if row.percentage < 90 %}<article class="automatic-alert"><span class="pct-{{ pct_level(row.percentage) }}">{{ row.percentage }}%</span><div><strong>{{ row.student.name }} · {{ item.course.code }}</strong><p>{{ row.absent }} faltas · El mínimo requerido para examen final es 80%.</p></div></article>{% endfor %}{% endfor %}
     {% if students_below_80 == 0 and courses|length == 0 %}<p class="muted">No hay cursos asignados.</p>{% endif %}
   </div>
 </section>

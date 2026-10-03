@@ -3,18 +3,18 @@
 {% block content %}
 <section class="login-layout">
   <div class="login-aside">
-    <div class="brand brand-light"><span class="brand-mark">U</span><span><strong>USPG</strong><small>Universidad</small></span></div>
+    <div class="brand brand-light"><img class="brand-logo brand-logo-lg" src="{{ url_for('static', filename='img/uspg-logo.jpg') }}" alt="" width="384" height="384"><span class="brand-text"><strong>Universidad San Pablo</strong><small>Guatemala</small></span></div>
     <div class="aside-copy">
       <p class="eyebrow">GESTIÓN ACADÉMICA</p>
-      <h1>Asistencia,<br>sin interrupciones.</h1>
+      <h1>Sistema de Control de Asistencia</h1>
       <p>Un registro claro para cada clase, desde el aula o el teléfono.</p>
     </div>
-    <span class="aside-index">CAMPUS DIGITAL <b>01 / 03</b></span>
+    <span class="aside-index">CAMPUS DIGITAL <b>USPG</b></span>
   </div>
   <div class="login-panel">
-    <div class="login-form-wrap">
-      <p class="eyebrow">BIENVENIDO DE NUEVO</p>
-      <h2>Inicia sesión</h2>
+    <div class="login-form-wrap auth-card">
+      <div class="auth-card-brand"><img class="brand-logo" src="{{ url_for('static', filename='img/uspg-logo.jpg') }}" alt="" width="384" height="384"><span><strong>UNIVERSIDAD SAN PABLO</strong><small>GUATEMALA</small></span></div>
+      <h2>Iniciar sesión</h2>
       <p class="muted">Usa las credenciales de tu cuenta institucional.</p>
       <form method="post" class="stack-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -25,7 +25,6 @@
         <button class="button button-primary button-wide" type="submit">Entrar <span aria-hidden="true">→</span></button>
       </form>
       <p class="login-note"><span class="status-dot"></span> Acceso protegido para la comunidad USPG</p>
-      <p class="register-link">¿Eres estudiante nuevo? <a href="{{ url_for('main.student_registration') }}">Crea tu cuenta</a></p>
     </div>
   </div>
 </section>

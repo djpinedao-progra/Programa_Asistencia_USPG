@@ -1,0 +1,4 @@
+{# Color de un porcentaje de asistencia: 90-100 verde, 80-89 amarillo, menos de 80 rojo. #}
+{% macro pct_level(value) -%}
+{{ 'good' if value >= 90 else ('watch' if value >= 80 else 'risk') }}
+{%- endmacro %}

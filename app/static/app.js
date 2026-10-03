@@ -1,5 +1,52 @@
 (() => {
-  const attendanceForm = document.querySelector(".start-attendance-form[data-teacher-id]");
+  const themeButtons = document.querySelectorAll("[data-theme-toggle]");
+  const syncThemeButtons = () => {
+    const dark = document.documentElement.dataset.theme === "dark";
+    const label = dark ? "Activar modo claro" : "Activar modo oscuro";
+    themeButtons.forEach((button) => {
+      button.setAttribute("aria-pressed", String(dark));
+      button.setAttribute("aria-label", label);
+      button.title = label;
+    });
+  };
+  themeButtons.forEach((button) => button.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try {
+      window.localStorage.setItem("uspg-theme", next);
+    } catch (_) {
+      // The theme still changes for this page when storage is unavailable.
+    }
+    syncThemeButtons();
+  }));
+  syncThemeButtons();
+
+  const sidebarToggle = document.querySelector("[data-sidebar-toggle]");
+  if (sidebarToggle) {
+    const setSidebarOpen = (open) => {
+      document.body.classList.toggle("sidebar-open", open);
+      sidebarToggle.setAttribute("aria-expanded", String(open));
+    };
+    sidebarToggle.addEventListener("click", () => setSidebarOpen(!document.body.classList.contains("sidebar-open")));
+    document.querySelectorAll("[data-sidebar-close], .sidebar-nav a").forEach((element) => {
+      element.addEventListener("click", () => setSidebarOpen(false));
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    });
+  }
+
+  const navLinks = [...document.querySelectorAll(".sidebar-nav a")];
+  const markCurrentLink = (link) => {
+    navLinks.forEach((item) => item.removeAttribute("aria-current"));
+    link.setAttribute("aria-current", "page");
+  };
+  const samePageLinks = navLinks.filter((link) => link.pathname === window.location.pathname);
+  const hashLink = samePageLinks.find((link) => link.hash && link.hash === window.location.hash);
+  if (hashLink) markCurrentLink(hashLink);
+  samePageLinks.forEach((link) => link.addEventListener("click", () => markCurrentLink(link)));
+
+  const attendanceForm =document.querySelector(".start-attendance-form[data-teacher-id]");
   if (attendanceForm) {
     const courseSelect = attendanceForm.querySelector("#attendance-course");
     const suggestion = attendanceForm.querySelector("[data-course-suggestion]");

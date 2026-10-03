@@ -1,44 +1,107 @@
+{% from "_icons.html" import icon, theme_toggle %}
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}Asistencia USPG{% endblock %} · USPG</title>
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% if current_user.is_authenticated %}has-sidebar{% else %}is-public{% endif %}">
   {% if current_user.is_authenticated %}
-  <header class="topbar">
-    <a class="brand" href="{{ url_for('main.dashboard') }}" aria-label="Panel de USPG">
-      <span class="brand-mark">U</span>
-      <span><strong>USPG</strong><small>Control académico</small></span>
-    </a>
-    <div class="topbar-user">
-      <span class="user-name">{{ current_user.name }}</span>
-      <span class="role-label">{{ {'admin': 'Administrador', 'docente': 'Docente', 'alumno': 'Alumno'}[current_user.role] }}</span>
-      <a class="text-link" href="{{ url_for('main.account_security') }}">Seguridad</a>
-      <form method="post" action="{{ url_for('main.logout') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="icon-button" type="submit" aria-label="Cerrar sesión" title="Cerrar sesión">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3m9-7h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6"/></svg>
-        </button>
-      </form>
-    </div>
-  </header>
+  {% set ep = request.endpoint %}
+  {% set role_name = {'admin': 'Administrador', 'docente': 'Docente', 'alumno': 'Alumno'}[current_user.role] %}
+  {% set name_parts = current_user.name.split() %}
+  {% set initials = ((name_parts[0][:1] if name_parts else '?') ~ (name_parts[1][:1] if name_parts|length > 1 else ''))|upper %}
+  {% if current_user.role == 'admin' %}
+    {% set nav_items = [
+      ('Inicio', url_for('main.admin_dashboard'), 'home', ep == 'main.admin_dashboard'),
+      ('Estudiantes', url_for('main.admin_students'), 'students', ep == 'main.admin_students' or (ep == 'main.admin_user_profile' and user is defined and user.role == 'alumno')),
+      ('Docentes', url_for('main.admin_teachers'), 'teacher', ep == 'main.admin_teachers' or (ep == 'main.admin_user_profile' and user is defined and user.role != 'alumno')),
+      ('Cursos', url_for('main.admin_courses'), 'courses', ep in ['main.admin_courses', 'main.admin_create_course', 'main.admin_update_course', 'main.admin_import_course_enrollments']),
+      ('Asistencias', url_for('main.admin_attendance_overview'), 'attendance', ep == 'main.admin_attendance_overview'),
+      ('Reportes', url_for('main.admin_reports'), 'reports', ep in ['main.admin_reports', 'main.admin_reports_pdf']),
+      ('Historial', url_for('main.admin_history'), 'history', ep in ['main.admin_history', 'main.admin_session_report_pdf']),
+      ('Auditoría', url_for('main.admin_audit_log'), 'audit', ep == 'main.admin_audit_log'),
+    ] %}
+  {% elif current_user.role == 'docente' %}
+    {% set home = url_for('main.teacher_dashboard') %}
+    {% set nav_items = [
+      ('Inicio', home, 'home', ep == 'main.teacher_dashboard'),
+      ('Mis cursos', home ~ '#mis-cursos', 'courses', ep == 'main.teacher_course'),
+      ('Tomar asistencia', home ~ '#tomar-asistencia', 'attendance', ep == 'main.teacher_session'),
+      ('Historial', url_for('main.teacher_history'), 'history', ep == 'main.teacher_history'),
+      ('Estudiantes', url_for('main.teacher_students'), 'students', ep == 'main.teacher_students'),
+      ('Avisos', home ~ '#avisos', 'notices', False),
+    ] %}
+  {% else %}
+    {% set home = url_for('main.student_dashboard') %}
+    {% set nav_items = [
+      ('Inicio', home, 'home', ep == 'main.student_dashboard'),
+      ('Mi asistencia', home ~ '#mi-asistencia', 'attendance', False),
+      ('Mis cursos', home ~ '#mis-cursos', 'courses', False),
+      ('Avisos', home ~ '#avisos', 'notices', False),
+      ('Historial', home ~ '#historial', 'history', False),
+      ('Registrar asistencia', home ~ '#registrar-asistencia', 'scan', ep == 'main.checkin'),
+    ] %}
   {% endif %}
-  <main class="page-shell {% if not current_user.is_authenticated %}auth-shell{% endif %}">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}<div class="flash-stack" role="status">
-        {% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}
-      </div>{% endif %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-  </main>
+  <div class="app-layout">
+    <aside class="sidebar" id="app-sidebar" aria-label="Navegación principal">
+      <a class="brand sidebar-brand" href="{{ url_for('main.dashboard') }}" aria-label="Panel de USPG">
+        <img class="brand-logo" src="{{ url_for('static', filename='img/uspg-logo.jpg') }}" alt="" width="384" height="384">
+        <span class="brand-text"><strong>Universidad<br>San Pablo</strong><small>Guatemala</small></span>
+      </a>
+      <nav class="sidebar-nav" aria-label="Secciones">
+        <p class="sidebar-label">{{ role_name }}</p>
+        {% for label, href, icon_name, active in nav_items %}<a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ icon(icon_name) }}<span>{{ label }}</span>{% if label == 'Avisos' and notices is defined and notices %}<span class="nav-count">{{ notices|length }}</span>{% endif %}</a>{% endfor %}
+        <p class="sidebar-label">Cuenta</p>
+        <a href="{{ url_for('main.account_security') }}" {% if ep == 'main.account_security' %}aria-current="page"{% endif %}>{{ icon('security') }}<span>Seguridad</span></a>
+      </nav>
+      <div class="sidebar-user">
+        <span class="avatar" aria-hidden="true">{{ initials }}</span>
+        <span><strong>{{ current_user.name }}</strong><small>{{ current_user.email }}</small></span>
+      </div>
+    </aside>
+    <div class="sidebar-backdrop" data-sidebar-close></div>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div class="topbar-start">
+          <button class="icon-button sidebar-toggle" type="button" data-sidebar-toggle aria-controls="app-sidebar" aria-expanded="false" aria-label="Abrir menú" title="Abrir menú">{{ icon('menu') }}</button>
+          <p class="crumb"><span>Sistema de asistencia</span><span class="crumb-sep" aria-hidden="true">/</span><strong>{{ self.title() }}</strong></p>
+        </div>
+        <div class="topbar-user">
+          {{ theme_toggle() }}
+          <span class="topbar-divider" aria-hidden="true"></span>
+          <span class="user-meta"><span class="user-name">{{ current_user.name }}</span><span class="role-label">{{ role_name }}</span></span>
+          <span class="avatar topbar-avatar" aria-hidden="true">{{ initials }}</span>
+          <form method="post" action="{{ url_for('main.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="icon-button" type="submit" aria-label="Cerrar sesión" title="Cerrar sesión">{{ icon('logout') }}</button>
+          </form>
+        </div>
+      </header>
+  {% endif %}
+      <main class="page-shell {% if not current_user.is_authenticated %}auth-shell{% endif %}">
+        {% if not current_user.is_authenticated %}{{ theme_toggle('theme-toggle-floating') }}{% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}<div class="flash-stack" role="status">
+            {% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}
+          </div>{% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </main>
+  {% if current_user.is_authenticated %}
+    </div>
+  </div>
+  {% endif %}
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>

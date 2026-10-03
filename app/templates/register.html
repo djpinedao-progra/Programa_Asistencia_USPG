@@ -2,8 +2,8 @@
 {% block title %}Crear cuenta de estudiante{% endblock %}
 {% block content %}
 <section class="register-layout">
-  <div class="register-intro"><a class="brand brand-light" href="{{ url_for('main.login') }}"><span class="brand-mark">U</span><span><strong>USPG</strong><small>Universidad</small></span></a><p class="eyebrow">PORTAL DE ESTUDIANTES</p><h1>Tu carnet.<br>Tu espacio.</h1><p>Regístrate con tus datos institucionales para consultar y marcar tu asistencia.</p></div>
-  <div class="register-panel"><div class="register-form-wrap"><p class="eyebrow">ALTA DE ESTUDIANTE</p><h2>Crear cuenta</h2><p class="muted">Este portal crea exclusivamente cuentas de alumno.</p>
+  <div class="register-intro"><a class="brand brand-light" href="{{ url_for('main.login') }}"><img class="brand-logo brand-logo-lg" src="{{ url_for('static', filename='img/uspg-logo.jpg') }}" alt="" width="384" height="384"><span class="brand-text"><strong>Universidad San Pablo</strong><small>Guatemala</small></span></a><p class="eyebrow">PORTAL DE ESTUDIANTES</p><h1>Tu carnet.<br>Tu espacio.</h1><p>Regístrate con tus datos institucionales para consultar y marcar tu asistencia.</p></div>
+  <div class="register-panel"><div class="register-form-wrap auth-card"><p class="eyebrow">ALTA DE ESTUDIANTE</p><h2>Crear cuenta</h2><p class="muted">Este portal crea exclusivamente cuentas de alumno.</p>
     <form method="post" class="stack-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label for="name">Nombre completo</label><input id="name" name="name" autocomplete="name" placeholder="Nombre y apellido" required>
