@@ -208,6 +208,29 @@ def test_seed_admin_accepts_short_password(app, monkeypatch):
         assert user.check_password("x")
 
 
+def test_seed_test_users_creates_and_resets_shared_accounts(app):
+    runner = app.test_cli_runner()
+    assert runner.invoke(args=["seed-test-users"]).exit_code == 0
+    with app.app_context():
+        alumno = db.session.scalar(select(User).where(User.email == "alumno@uspg.edu"))
+        alumno.set_password("otra")
+        db.session.commit()
+
+    assert runner.invoke(args=["seed-test-users"]).exit_code == 0
+    with app.app_context():
+        users = {
+            user.email: user
+            for user in db.session.scalars(select(User).where(User.email.like("%@uspg.edu")))
+        }
+        assert {email: user.role for email, user in users.items()} == {
+            "admin@uspg.edu": "admin",
+            "docente@uspg.edu": "docente",
+            "alumno@uspg.edu": "alumno",
+        }
+        assert all(user.check_password("123") for user in users.values())
+        assert users["alumno@uspg.edu"].carnet == "2600001"
+
+
 def test_admin_can_see_teacher_student_data_and_attendance(app):
     with app.app_context():
         create_user("Admin", "admin@uspg.edu", "admin")
