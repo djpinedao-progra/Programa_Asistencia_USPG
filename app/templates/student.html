@@ -3,15 +3,15 @@
 {% block title %}Inicio del estudiante{% endblock %}
 {% block head %}<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>{% endblock %}
 {% block content %}
-<div class="page-heading" id="inicio"><div><p class="eyebrow">ESPACIO DEL ALUMNO</p><h1>Hola, {{ current_user.name.split()[0] }}</h1><p class="muted">Este es tu resumen académico. Revisa tu asistencia y mantente al día en tus cursos.</p></div><a class="button button-primary" href="#mis-cursos">Ver mis cursos <span aria-hidden="true">→</span></a></div>
-<section class="stat-grid stat-grid-3" aria-label="Resumen general">
+<div class="page-heading" id="inicio" data-view="inicio"><div><p class="eyebrow">ESPACIO DEL ALUMNO</p><h1>Hola, {{ current_user.name.split()[0] }}</h1><p class="muted">Este es tu resumen académico. Revisa tu asistencia y mantente al día en tus cursos.</p></div><a class="button button-primary" href="#mis-cursos">Ver mis cursos <span aria-hidden="true">→</span></a></div>
+<section class="stat-grid stat-grid-3" aria-label="Resumen general" data-view="inicio">
   {% set overall_level = pct_level(overall_percentage) if total_sessions else 'good' %}
   <div class="stat-card"><span class="stat-label">Asistencia general</span><strong class="stat-value">{{ overall_percentage }}<small>%</small></strong><div class="stat-progress stat-progress-{{ overall_level }}" role="img" aria-label="{{ overall_percentage }} por ciento de asistencia"><span style="width: {{ overall_percentage }}%"></span></div><small class="stat-note">{{ total_attended }} presentes de {{ total_sessions }} sesiones</small></div>
   <div class="stat-card"><span class="stat-label">Cursos registrados</span><strong class="stat-value">{{ courses|length }}</strong><small class="stat-note">con asistencia registrada</small></div>
   <div class="stat-card"><span class="stat-label">Faltas estimadas</span><strong class="stat-value">{{ total_absences }}</strong><small class="stat-note">en sesiones impartidas</small></div>
 </section>
 
-<section class="student-section" id="mi-asistencia">
+<section class="student-section" id="mi-asistencia" data-view="mi-asistencia">
   <div class="section-heading"><div><p class="eyebrow">SEGUIMIENTO</p><h2>Mi asistencia</h2></div><span class="section-number">{{ total_sessions }} sesiones</span></div>
   <div class="student-attendance-layout">
     <div class="attendance-chart-block">
@@ -37,7 +37,7 @@
   </div>
 </section>
 
-<section class="student-section" id="mis-cursos">
+<section class="student-section" id="mis-cursos" data-view="mis-cursos">
   <div class="section-heading"><div><p class="eyebrow">CURSOS</p><h2>Mis cursos</h2></div><span class="section-number">{{ courses|length }} registrados</span></div>
   <p class="muted student-section-intro">Cada bloque muestra tu porcentaje de asistencia, faltas y los registros de ese curso.</p>
   <div class="student-course-grid">
@@ -56,7 +56,7 @@
   </div>
 </section>
 
-<section class="student-section" id="avisos">
+<section class="student-section" id="avisos" data-view="avisos">
   <div class="section-heading"><div><p class="eyebrow">ATENCIÓN ACADÉMICA</p><h2>Avisos</h2></div><span class="section-number">{{ notices|length }} activos</span></div>
   <div class="notice-minimum"><strong>80% es el mínimo requerido</strong><span>Debajo de ese porcentaje podrías perder el derecho a examen final.</span></div>
   {% if received_notices %}<div class="received-notices"><h3>Avisos de tus docentes</h3>{% for notice in received_notices %}<article class="notice-item"><span class="notice-mark" aria-hidden="true">i</span><div><strong>{{ notice.course.name }} · {{ notice.course.code }}</strong><p>{{ notice.message }}</p><time>{{ (notice.created_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></div></article>{% endfor %}</div>{% endif %}
@@ -66,7 +66,7 @@
   <p class="muted student-data-note">Tus cursos registrados: {% if courses %}{% for course in courses %}{{ course.course.name }} ({{ course.course.code }}){% if not loop.last %}, {% endif %}{% endfor %}{% else %}ninguno todavía{% endif %}.</p>
 </section>
 
-<section class="student-section student-history" id="historial">
+<section class="student-section student-history" id="historial" data-view="historial">
   <div class="section-heading"><div><p class="eyebrow">REGISTROS</p><h2>Historial de asistencias</h2></div><span class="section-number">{{ history_total }} registros</span></div>
   <div class="table-wrap"><table><thead><tr><th>Curso</th><th>Código</th><th>Estado</th><th>Fecha</th><th>Hora</th></tr></thead><tbody>
     {% for attendance in history_attendances %}<tr><td class="primary-cell" data-label="Curso">{{ attendance.session.course.name }}</td><td data-label="Código">{{ attendance.session.course.code }}</td><td data-label="Estado"><span class="session-state state-{{ attendance.status }}">{{ attendance.status|capitalize }}</span></td><td data-label="Fecha">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y') }}</td><td data-label="Hora"><span class="time-cell">{{ (attendance.recorded_at|localtime).strftime('%H:%M') }}</span></td></tr>
@@ -75,6 +75,7 @@
   <nav class="pagination-controls" aria-label="Paginación del historial"><span>{{ history_attendances|length }} de {{ history_total }} registros · Página {{ history_page }} de {{ history_pages }}</span><div>{% if history_page > 1 %}<a class="button button-outline button-small" href="{{ url_for('main.student_dashboard', page=history_page - 1) }}#historial">Anterior</a>{% endif %}{% if history_page < history_pages %}<a class="button button-outline button-small" href="{{ url_for('main.student_dashboard', page=history_page + 1) }}#historial">Siguiente</a>{% endif %}</div></nav>
 </section>
 
+<div data-view="registrar-asistencia">
 <div class="student-scan-heading" id="registrar-asistencia">
   <div class="page-heading">
   <div><p class="eyebrow">REGISTRAR</p><h2>Marca tu asistencia</h2><p class="muted">Escanea el QR que comparte tu docente para marcar presencia.</p></div>
@@ -86,4 +87,5 @@
   <div id="qr-reader"></div><p class="scanner-message" data-scan-message role="status" aria-live="polite">Al tocar Escanear QR, el navegador solicitará permiso para usar la cámara.</p>
   <form method="post" action="{{ url_for('main.record_attendance') }}" class="scan-submit" data-scan-form hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="token"><span data-scan-success></span><button class="button button-primary" type="submit">Registrar asistencia <span aria-hidden="true">→</span></button></form>
 </section>
+</div>
 {% endblock %}

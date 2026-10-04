@@ -43,14 +43,41 @@
   };
   const samePageLinks = navLinks.filter((link) => link.pathname === window.location.pathname);
   const markLinkFromHash = () => {
-    const hashLink = samePageLinks.find((link) => link.hash && link.hash === window.location.hash);
-    if (hashLink) markCurrentLink(hashLink);
+    const current = samePageLinks.find((link) => link.hash === window.location.hash)
+      || (window.location.hash ? null : samePageLinks.find((link) => !link.hash));
+    if (current) markCurrentLink(current);
   };
   markLinkFromHash();
   window.addEventListener("hashchange", markLinkFromHash);
   samePageLinks.forEach((link) => link.addEventListener("click", () => markCurrentLink(link)));
 
-  const attendanceForm =document.querySelector(".start-attendance-form[data-teacher-id]");
+  const views = [...document.querySelectorAll("[data-view]")];
+  if (views.length) {
+    const viewNames = new Set(views.map((view) => view.dataset.view));
+    const showView = (hash) => {
+      const name = viewNames.has(hash.slice(1)) ? hash.slice(1) : "inicio";
+      views.forEach((view) => {
+        view.hidden = view.dataset.view !== name;
+      });
+      window.scrollTo({ top: 0, behavior: "instant" });
+    };
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest("a[href]");
+      if (!link || link.pathname !== window.location.pathname || link.search !== window.location.search) return;
+      if (!viewNames.has(link.hash.slice(1) || "inicio")) return;
+      event.preventDefault();
+      if (link.href !== window.location.href) window.history.pushState(null, "", link.href);
+      showView(link.hash);
+      markLinkFromHash();
+    });
+    window.addEventListener("popstate", () => {
+      showView(window.location.hash);
+      markLinkFromHash();
+    });
+    showView(window.location.hash);
+  }
+
+  const attendanceForm = document.querySelector(".start-attendance-form[data-teacher-id]");
   if (attendanceForm) {
     const courseSelect = attendanceForm.querySelector("#attendance-course");
     const suggestion = attendanceForm.querySelector("[data-course-suggestion]");

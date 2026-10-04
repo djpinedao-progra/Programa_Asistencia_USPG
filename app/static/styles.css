@@ -458,7 +458,7 @@ input[type="file"] { padding: 10px; border: 1px dashed var(--line-strong); borde
 .table-secondary { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 400; }
 .empty-cell { padding: 24px 14px !important; color: var(--muted); text-align: center; }
 p.empty-cell { margin: 0; }
-.time-cell { color: var(--accent-text); font-weight: 700; }
+.time-cell { color: var(--ink); font-weight: 800; letter-spacing: .02em; }
 .pct-good { color: var(--present-ink); }
 .pct-watch { color: var(--watch-ink); }
 .pct-risk { color: var(--absence-ink); }

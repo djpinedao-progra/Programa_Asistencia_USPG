@@ -102,6 +102,7 @@ def test_teacher_starts_attendance_and_sees_live_sync_in_browser(app, browser_pa
         course_id = course.id
 
     sign_in(page, base_url, "docente@uspg.edu")
+    page.locator(".sidebar-nav").get_by_role("link", name="Tomar asistencia").click()
     page.locator("#attendance-course").select_option(str(course_id))
     page.get_by_role("button", name="Iniciar asistencia").click()
     expect(page).to_have_url(re.compile(r"/docente/sesiones/\d+$"))
