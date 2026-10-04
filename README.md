@@ -39,13 +39,18 @@ Aplicación web en Python para gestionar la asistencia universitaria con cuentas
 	flask --app run.py seed-test-users
 	```
 
-	| Rol | Usuario | Contraseña |
-	| --- | --- | --- |
-	| Administrador | admin@uspg.edu | 123 |
-	| Docente | docente@uspg.edu | 123 |
-	| Alumno | alumno@uspg.edu (carnet 2600001) | 123 |
+	| Rol | Nombre | Usuario | Carnet | Contraseña |
+	| --- | --- | --- | --- | --- |
+	| Administrador | Administrador Demo | admin@uspg.edu | — | 123 |
+	| Docente | Carlos Méndez | docente@uspg.edu | — | 123 |
+	| Alumno | Ana López | alumno1@uspg.edu | 2600010 | 123 |
+	| Alumno | Luis Pérez | alumno2@uspg.edu | 2600011 | 123 |
+	| Alumno | María García | alumno3@uspg.edu | 2600012 | 123 |
+	| Alumno | Carlos Morales | alumno4@uspg.edu | 2600013 | 123 |
+	| Alumno | José Hernández | alumno5@uspg.edu | 2600014 | 123 |
+	| Alumno | Sofía Castillo | alumno6@uspg.edu | 2600015 | 123 |
 
-	El comando crea las cuentas que falten y vuelve a poner la contraseña `123` en las que ya existan. Son solo para desarrollo: no lo ejecutes en un servidor público.
+	También crea los cursos ING-220, ING-221 e ING-222 con Carlos Méndez como docente, los seis alumnos matriculados y diez sesiones de asistencia por curso. El comando crea lo que falte y vuelve a poner la contraseña `123` en las cuentas que ya existan; no duplica cursos. Los datos son solo para desarrollo: no lo ejecutes en un servidor público.
 
 	Si actualizas una instalación anterior, ejecuta `flask --app run.py migrate-carnet`, `flask --app run.py migrate-teacher-tools` y `flask --app run.py migrate-audit-log`. Estas migraciones agregan campos y tablas sin eliminar los cursos o asistencias guardados. El carnet se solicita para los alumnos nuevos y las cuentas existentes pueden no tenerlo hasta completar la migración institucional.
 
