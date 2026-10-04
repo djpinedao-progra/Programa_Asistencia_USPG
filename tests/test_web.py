@@ -242,6 +242,32 @@ def test_seed_test_users_creates_shared_data_once_and_resets_passwords(app):
         assert [percentage(f"alumno{i}@uspg.edu") for i in range(1, 7)] == [100, 90, 80, 63, 70, 90]
 
 
+def test_seed_test_users_replaces_previous_three_test_accounts(app):
+    with app.app_context():
+        for name, email, role, carnet in [
+            ("Administrador", "admin@uspg.edu", "admin", None),
+            ("Docente de prueba", "docente@uspg.edu", "docente", None),
+            ("Alumno de prueba", "alumno@uspg.edu", "alumno", "2600001"),
+        ]:
+            user = User(name=name, email=email, role=role, carnet=carnet)
+            user.set_password("123")
+            db.session.add(user)
+        db.session.commit()
+
+    result = app.test_cli_runner().invoke(args=["seed-test-users"])
+    assert result.exit_code == 0, result.output
+
+    with app.app_context():
+        names = {
+            user.email: user.name
+            for user in db.session.scalars(select(User).where(User.email.like("%@uspg.edu")))
+        }
+        assert "alumno@uspg.edu" not in names
+        assert len(names) == 8
+        assert names["admin@uspg.edu"] == "Administrador Demo"
+        assert names["docente@uspg.edu"] == "Carlos Méndez"
+
+
 def test_admin_can_see_teacher_student_data_and_attendance(app):
     with app.app_context():
         create_user("Admin", "admin@uspg.edu", "admin")
