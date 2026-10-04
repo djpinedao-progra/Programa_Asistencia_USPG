@@ -208,11 +208,11 @@ def test_seed_admin_accepts_short_password(app, monkeypatch):
         assert user.check_password("x")
 
 
-def test_seed_test_users_creates_and_resets_shared_accounts(app):
+def test_seed_test_users_creates_shared_data_once_and_resets_passwords(app):
     runner = app.test_cli_runner()
     assert runner.invoke(args=["seed-test-users"]).exit_code == 0
     with app.app_context():
-        alumno = db.session.scalar(select(User).where(User.email == "alumno@uspg.edu"))
+        alumno = db.session.scalar(select(User).where(User.email == "alumno4@uspg.edu"))
         alumno.set_password("otra")
         db.session.commit()
 
@@ -225,10 +225,21 @@ def test_seed_test_users_creates_and_resets_shared_accounts(app):
         assert {email: user.role for email, user in users.items()} == {
             "admin@uspg.edu": "admin",
             "docente@uspg.edu": "docente",
-            "alumno@uspg.edu": "alumno",
+            **{f"alumno{i}@uspg.edu": "alumno" for i in range(1, 7)},
         }
         assert all(user.check_password("123") for user in users.values())
-        assert users["alumno@uspg.edu"].carnet == "2600001"
+        assert users["docente@uspg.edu"].name == "Carlos Méndez"
+        assert users["alumno1@uspg.edu"].carnet == "2600010"
+        assert db.session.query(Course).count() == 3
+        assert db.session.query(Attendance).count() == 3 * 10 * 6
+
+        def percentage(email):
+            records = db.session.scalars(
+                select(Attendance).where(Attendance.student_id == users[email].id)
+            ).all()
+            return round(sum(r.status == "presente" for r in records) / len(records) * 100)
+
+        assert [percentage(f"alumno{i}@uspg.edu") for i in range(1, 7)] == [100, 90, 80, 63, 70, 90]
 
 
 def test_admin_can_see_teacher_student_data_and_attendance(app):

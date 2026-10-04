@@ -198,33 +198,17 @@ def create_app(test_config=None):
 
     @app.cli.command("seed-test-users")
     def seed_test_users_command():
-        """Create or reset the shared test accounts used by the whole team."""
-        from app.models import User
+        """Create or reset the shared test accounts, courses and attendance used by the team."""
+        from app.test_data import TEST_PASSWORD, seed_test_data
 
-        password = "123"
-        accounts = [
-            ("Administrador", "admin@uspg.edu", "admin", None),
-            ("Docente de prueba", "docente@uspg.edu", "docente", None),
-            ("Alumno de prueba", "alumno@uspg.edu", "alumno", "2600001"),
-        ]
-        for name, email, role, carnet in accounts:
-            user = db.session.scalar(select(User).where(User.email == email))
-            if user is None:
-                if carnet and db.session.scalar(select(User).where(User.carnet == carnet)):
-                    carnet = None
-                user = User(name=name, email=email, role=role, carnet=carnet)
-                db.session.add(user)
-                action = "creada"
-            elif user.role != role:
-                db.session.rollback()
-                raise click.ClickException(
-                    f"{email} ya existe con el rol {user.role}; no se modificó ninguna cuenta."
-                )
-            else:
-                action = "contraseña restablecida"
-            user.set_password(password)
-            click.echo(f"{email} ({role}): {action}")
-        db.session.commit()
-        click.echo(f"Contraseña de las cuentas de prueba: {password}. Úsalas solo en desarrollo.")
+        try:
+            messages = seed_test_data()
+        except ValueError as error:
+            raise click.ClickException(str(error)) from error
+        for message in messages:
+            click.echo(message)
+        click.echo(
+            f"Contraseña de las cuentas de prueba: {TEST_PASSWORD}. Úsalas solo en desarrollo."
+        )
 
     return app
