@@ -1,10 +1,18 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 
 from app import db
-from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, User
+from app.models import (
+    Attendance,
+    AttendanceSession,
+    AuditLog,
+    Course,
+    CourseEnrollment,
+    Notice,
+    User,
+)
 
 TEST_PASSWORD = "123"
 
@@ -38,10 +46,31 @@ ABSENT_SESSIONS = {
 EXTRA_ABSENCES = {("ING-222", "alumno4@uspg.edu"): {8, 9}}
 JUSTIFIED_SESSIONS = {"alumno5@uspg.edu": {9}}
 
+# Account created by the first version of seed-test-users; removed so teams don't keep it.
+LEGACY_TEST_STUDENT = ("alumno@uspg.edu", "Alumno de prueba", "2600001")
+
+
+def _remove_legacy_test_student():
+    email, name, carnet = LEGACY_TEST_STUDENT
+    legacy = db.session.scalar(
+        select(User).where(User.email == email, User.name == name, User.carnet == carnet)
+    )
+    if legacy is None:
+        return None
+    for model in (Attendance, CourseEnrollment, Notice):
+        db.session.execute(delete(model).where(model.student_id == legacy.id))
+    db.session.execute(update(AuditLog).where(AuditLog.actor_id == legacy.id).values(actor_id=None))
+    db.session.delete(legacy)
+    db.session.flush()
+    return f"{email}: cuenta de prueba anterior eliminada"
+
 
 def seed_test_data():
     """Create or reset the shared test accounts, courses and attendance history."""
     messages = []
+    removed = _remove_legacy_test_student()
+    if removed:
+        messages.append(removed)
     users = {}
     for name, email, role, carnet in TEST_USERS:
         user = db.session.scalar(select(User).where(User.email == email))
@@ -57,7 +86,12 @@ def seed_test_data():
                 f"{email} ya existe con el rol {user.role}; no se modificó ninguna cuenta."
             )
         else:
-            action = "contraseña restablecida"
+            user.name = name
+            if carnet and not user.carnet and not db.session.scalar(
+                select(User).where(User.carnet == carnet)
+            ):
+                user.carnet = carnet
+            action = "actualizada"
         user.set_password(TEST_PASSWORD)
         users[email] = user
         messages.append(f"{email} ({role}): {action}")
