@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Asistencia · Expo San Pablo{% endblock %}
+{% block content %}
+<section class="expo-public">
+  <header class="expo-intro">
+    <img src="{{ url_for('static', filename='uspg-official.png') }}" alt="Universidad San Pablo Guatemala">
+    <p class="eyebrow">EXPO SAN PABLO</p>
+    <h1>Tu participación cuenta.</h1>
+    <p class="muted">Registra tu asistencia y comparte tu experiencia. Sin cuenta ni contraseña.</p>
+  </header>
+  {% if registered %}
+  <div class="panel form-panel"><h2>¡Registro completado!</h2><p>Gracias por ser parte de la Expo San Pablo.</p><a class="button" href="{{ url_for('expo.registration') }}">Registrar a otra persona</a></div>
+  {% else %}
+  <form method="post" class="panel form-panel stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="expo-name">Nombre completo</label>
+    <input id="expo-name" name="name" autocomplete="name" required minlength="2" maxlength="120" value="{{ values.get('name', '') }}">
+    <label for="expo-email">Correo electrónico</label>
+    <input id="expo-email" name="email" type="email" autocomplete="email" required maxlength="254" value="{{ values.get('email', '') }}" aria-describedby="email-help">
+    <small id="email-help">Aceptamos correos personales e institucionales de cualquier proveedor.</small>
+    <label for="expo-category">¿Cómo participas en el evento?</label>
+    <select id="expo-category" name="category" required><option value="">Selecciona tu categoría</option>{% for key, label in categories.items() %}<option value="{{ key }}" {% if values.get('category') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <label for="expo-participation">Tu participación</label>
+    <textarea id="expo-participation" name="participation" required maxlength="500" rows="3" placeholder="Por ejemplo: visitante, expositor o participante de un taller.">{{ values.get('participation', '') }}</textarea>
+    <label for="expo-opinion">Tu opinión del evento <span class="muted">(opcional)</span></label>
+    <textarea id="expo-opinion" name="opinion" maxlength="2000" rows="4" placeholder="¿Qué te gustó y qué podemos mejorar?">{{ values.get('opinion', '') }}</textarea>
+    <label class="expo-consent"><input type="checkbox" name="consent" value="yes" required {% if values.get('consent') == 'yes' %}checked{% endif %}><span>Autorizo el uso de estos datos para el control de asistencia y el reporte de la Expo San Pablo. Solo el administrador podrá consultar mis datos y opinión.</span></label>
+    <button class="button button-primary button-wide" type="submit">Registrar mi asistencia →</button>
+    <small>Se contará una asistencia por correo en este evento. La categoría es declarada por cada participante.</small>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

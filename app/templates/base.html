@@ -7,15 +7,38 @@
   <title>{% block title %}Asistencia USPG{% endblock %} · USPG</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20261005-reference3') }}">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% if current_user.is_authenticated %}admin-layout{% endif %}">
   {% if current_user.is_authenticated %}
+  {% if current_user.is_authenticated %}
+  <aside class="institution-sidebar">
+    <a class="sidebar-brand" href="{{ url_for('main.admin_dashboard') }}"><img src="{{ url_for('static', filename='uspg-official.png') }}" alt="Universidad San Pablo Guatemala"></a>
+    <p class="sidebar-caption">CONTROL DE ASISTENCIA</p>
+    <nav class="admin-nav" aria-label="Navegación principal">
+{% if current_user.role == 'admin' %}{% include "sidebar_admin_links.html" %}
+{% elif current_user.role == 'docente' %}
+<a href="{{ url_for('main.teacher_dashboard') }}">Resumen</a>
+<a href="{{ url_for('main.teacher_dashboard') }}#mis-cursos">Mis cursos</a>
+<a href="{{ url_for('main.teacher_dashboard') }}#tomar-asistencia">Tomar asistencia</a>
+<a href="{{ url_for('main.teacher_students') }}">Estudiantes</a>
+<a href="{{ url_for('main.teacher_history') }}">Historial</a>
+{% else %}
+<a href="{{ url_for('main.student_dashboard') }}">Resumen</a>
+<a href="{{ url_for('main.student_dashboard') }}#mi-asistencia">Mi asistencia</a>
+<a href="{{ url_for('main.student_dashboard') }}#mis-cursos">Mis cursos</a>
+<a href="{{ url_for('main.student_dashboard') }}#avisos">Avisos</a>
+{% endif %}
+<a href="{{ url_for('main.account_security') }}">Seguridad</a>
+</nav>
+    <div class="sidebar-footer">Comunidad USPG<small>Gestión académica</small></div>
+  </aside>
+  {% endif %}
   <header class="topbar">
     <a class="brand" href="{{ url_for('main.dashboard') }}" aria-label="Panel de USPG">
-      <span class="brand-mark">U</span>
+      <img class="header-brand-image" src="{{ url_for('static', filename='uspg-official.png') }}" alt="">
       <span><strong>USPG</strong><small>Control académico</small></span>
     </a>
     <div class="topbar-user">
