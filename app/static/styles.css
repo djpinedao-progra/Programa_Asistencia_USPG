@@ -24,7 +24,7 @@
   --shadow-sm: 0 1px 3px rgba(56, 24, 30, .06), 0 5px 16px rgba(56, 24, 30, .035);
   --shadow-hover: 0 8px 22px rgba(75, 10, 20, .11);
   --focus-ring: 0 0 0 3px rgba(181, 18, 43, .14);
-  --font-body: "DM Sans", "Segoe UI", sans-serif;
+  --font-body: "Rethink Sans", "Segoe UI", sans-serif;
   --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
   --shadow: var(--shadow-hover);
   font-family: var(--font-body);
@@ -41,9 +41,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
 .topbar { height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 max(5vw, 24px); background: var(--surface); border-bottom: 1px solid var(--line); }
 .brand { display: inline-flex; align-items: center; gap: 11px; }
-.brand-mark { display: grid; place-items: center; width: 38px; height: 38px; background: var(--teal); color: white; font: 800 21px "Manrope", sans-serif; border-radius: 11px 3px 11px 3px; }
+.brand-mark { display: grid; place-items: center; width: 38px; height: 38px; background: var(--teal); color: white; font: 800 21px "Rethink Sans", sans-serif; border-radius: 11px 3px 11px 3px; }
 .brand strong, .brand small { display: block; }
-.brand strong { font: 800 15px "Manrope", sans-serif; letter-spacing: .04em; }
+.brand strong { font: 800 15px "Rethink Sans", sans-serif; letter-spacing: .04em; }
 .brand small { margin-top: 1px; color: var(--muted); font-size: 10px; }
 .topbar-user { display: flex; align-items: center; gap: 12px; }
 .user-name { font-size: 13px; font-weight: 700; }
@@ -56,20 +56,20 @@ a { color: inherit; text-decoration: none; }
 .auth-shell { width: 100%; max-width: none; margin: 0; padding: 0; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 35px; }
 h1, h2, p { margin-top: 0; }
-h1, h2 { font-family: "Manrope", sans-serif; letter-spacing: 0; }
+h1, h2 { font-family: "Rethink Sans", sans-serif; letter-spacing: 0; }
 .page-heading h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.18; }
 .page-heading .muted { margin: 0; }
 .eyebrow { margin: 0 0 9px; color: var(--teal); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
 .muted { color: var(--muted); font-size: 14px; line-height: 1.6; }
-.heading-count { color: var(--teal); font: 800 29px "Manrope", sans-serif; white-space: nowrap; }
-.heading-count small { color: var(--muted); font: 500 12px "DM Sans", sans-serif; }
+.heading-count { color: var(--teal); font: 800 29px "Rethink Sans", sans-serif; white-space: nowrap; }
+.heading-count small { color: var(--muted); font: 500 12px "Rethink Sans", sans-serif; }
 .admin-grid, .teacher-grid { display: grid; grid-template-columns: minmax(275px, .75fr) minmax(0, 1.5fr); gap: 55px; align-items: start; }
 .teacher-grid { grid-template-columns: minmax(0, 1.5fr) minmax(275px, .75fr); }
 .panel { border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
 .form-panel { padding: 25px; border-radius: 5px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
 .section-heading h2 { margin: 0; font-size: 18px; line-height: 1.35; }
-.section-number { color: var(--teal); font: 700 12px "Manrope", sans-serif; }
+.section-number { color: var(--teal); font: 700 12px "Rethink Sans", sans-serif; }
 .stack-form { display: grid; gap: 10px; }
 .stack-form label { margin-top: 7px; color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .stack-form input, .stack-form select { width: 100%; min-height: 44px; padding: 0 12px; color: var(--ink); border: 1px solid var(--line); border-radius: 3px; outline: none; background: #fffdfd; font-size: 13px; }
@@ -102,20 +102,20 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .text-link { color: var(--teal); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .course-list-large { margin-top: 2px; }
 .course-list-large .course-row { min-height: 84px; }
-.course-symbol { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; color: var(--teal); background: #fbe7ea; border-radius: 4px; font: 800 16px "Manrope", sans-serif; }
+.course-symbol { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; color: var(--teal); background: #fbe7ea; border-radius: 4px; font: 800 16px "Rethink Sans", sans-serif; }
 .course-info { min-width: 0; flex: 1; }
 .note-block { display: flex; gap: 10px; margin-top: 24px; padding: 14px; background: #fff5f6; }
 .note-block p { margin: 0; color: var(--ink-soft); font-size: 11px; line-height: 1.6; }
 .note-icon { display: grid; place-items: center; flex: 0 0 18px; width: 18px; height: 18px; color: var(--teal); border: 1px solid #e0aab3; border-radius: 50%; font-size: 11px; font-weight: 700; }
 .empty-state { display: flex; flex-direction: column; align-items: center; padding: 45px 20px; text-align: center; }
 .empty-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 14px; color: var(--teal); background: #fbe7ea; border-radius: 50%; font-size: 20px; }
-.empty-state strong { font: 700 14px "Manrope", sans-serif; }
+.empty-state strong { font: 700 14px "Rethink Sans", sans-serif; }
 .empty-state p { max-width: 260px; margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .flash-stack { display: grid; gap: 8px; margin: -28px 0 24px; }
 .flash { padding: 12px 15px; border-left: 3px solid var(--teal); background: #fff1f3; font-size: 13px; }
 .flash-error { border-color: var(--coral); background: #fff0eb; }
 .flash-warning { border-color: var(--gold); background: #fff7df; }
-.login-layout { display: grid; min-height: 100vh; grid-template-columns: minmax(320px, .92fr) 1.08fr; }
+.login-layout { display: grid; min-height: 100vh; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .login-aside { position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; min-height: 100vh; padding: 48px clamp(32px, 7vw, 100px); color: white; background: var(--teal-dark); }
 .login-aside::after { position: absolute; right: -110px; bottom: 100px; width: 340px; height: 340px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 50%; box-shadow: 0 0 0 35px rgba(255, 255, 255, .07), 0 0 0 70px rgba(255, 255, 255, .04); content: ""; }
 .brand-light .brand-mark { color: var(--teal-dark); background: var(--lime); }
@@ -155,10 +155,10 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .session-meta { display: flex; width: 100%; justify-content: center; gap: 44px; padding-top: 18px; border-top: 1px solid var(--line); }
 .session-meta div span, .session-meta div strong { display: block; }
 .session-meta div span { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
-.session-meta div strong { margin-top: 5px; color: var(--ink); font: 700 17px "Manrope", sans-serif; }
+.session-meta div strong { margin-top: 5px; color: var(--ink); font: 700 17px "Rethink Sans", sans-serif; }
 .attendance-section { min-width: 0; padding: 28px 30px; background: #fffdfd; }
 .attendance-count { display: flex; align-items: baseline; gap: 10px; padding: 15px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.attendance-count strong { color: var(--teal); font: 800 28px "Manrope", sans-serif; }
+.attendance-count strong { color: var(--teal); font: 800 28px "Rethink Sans", sans-serif; }
 .attendance-count span { color: var(--muted); font-size: 11px; }
 .attendance-row { display: flex; align-items: center; gap: 11px; min-height: 62px; border-bottom: 1px solid var(--line); }
 .avatar { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; color: var(--teal-dark); background: #fbe7ea; border-radius: 50%; font-weight: 700; }
@@ -169,7 +169,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .attendance-row time { white-space: nowrap; }
 .qr-expired { display: grid; flex: 1; place-content: center; justify-items: center; text-align: center; }
 .qr-expired > span { color: var(--coral); font-size: 40px; }
-.qr-expired strong { margin-top: 10px; font: 700 14px "Manrope", sans-serif; }
+.qr-expired strong { margin-top: 10px; font: 700 14px "Rethink Sans", sans-serif; }
 .qr-expired p { max-width: 240px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .download-button { flex: 0 0 40px; }
 .student-records { margin-top: 45px; }
@@ -190,7 +190,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .student-overview > div { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, .18); }
 .student-overview > div:last-child { border-bottom: 0; }
 .student-overview span, .student-overview div > small { color: #f1c8cf; font-size: 11px; }
-.student-overview strong { grid-row: span 2; grid-column: 2; font: 700 25px "Manrope", sans-serif; }
+.student-overview strong { grid-row: span 2; grid-column: 2; font: 700 25px "Rethink Sans", sans-serif; }
 .student-overview strong small { font: inherit; font-size: 14px; }
 .student-section { padding: 35px 0 39px; border-top: 1px solid var(--line); scroll-margin-top: 70px; }
 .student-section > .section-heading { margin-bottom: 24px; }
@@ -198,7 +198,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .attendance-chart-block { display: grid; justify-items: center; gap: 18px; }
 .attendance-donut { display: grid; place-items: center; width: 174px; aspect-ratio: 1; border-radius: 50%; background: conic-gradient(var(--teal) var(--attendance-rate), #eadfe1 0); }
 .attendance-donut > div { display: grid; place-content: center; width: 124px; aspect-ratio: 1; border-radius: 50%; background: white; text-align: center; }
-.attendance-donut strong { font: 800 29px "Manrope", sans-serif; }
+.attendance-donut strong { font: 800 29px "Rethink Sans", sans-serif; }
 .attendance-donut span { color: var(--muted); font-size: 11px; }
 .chart-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 13px; }
 .chart-legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
@@ -206,7 +206,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .chart-legend .legend-absence { background: #d9cfd0; }
 .chart-legend strong { color: var(--ink); }
 .student-alert { padding: 18px 20px; border-left: 3px solid var(--teal); background: #f8edef; }
-.student-alert strong { font: 700 15px "Manrope", sans-serif; }
+.student-alert strong { font: 700 15px "Rethink Sans", sans-serif; }
 .student-alert p { margin: 8px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.6; }
 .alert-risk { border-color: var(--coral); background: #fff0eb; }
 .alert-warning { border-color: var(--gold); background: #fff7df; }
@@ -214,7 +214,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .student-data-note { margin: 13px 0 0; font-size: 11px; }
 .recent-list { margin-top: 33px; }
 .recent-list .section-heading { margin-bottom: 8px; }
-.recent-list h3 { margin: 0; font: 700 15px "Manrope", sans-serif; }
+.recent-list h3 { margin: 0; font: 700 15px "Rethink Sans", sans-serif; }
 .recent-attendance { display: flex; align-items: center; gap: 12px; min-height: 60px; border-bottom: 1px solid var(--line); }
 .recent-check { display: grid; place-items: center; flex: 0 0 30px; width: 30px; aspect-ratio: 1; border-radius: 50%; color: #47745d; background: #edf5ef; font-size: 14px; }
 .recent-attendance > div { min-width: 0; flex: 1; }
@@ -227,9 +227,9 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .student-course { min-width: 0; padding: 20px; border: 1px solid var(--line); background: white; }
 .student-course-top { display: flex; justify-content: space-between; gap: 15px; }
 .student-course-top .eyebrow { margin-bottom: 5px; }
-.student-course h3 { margin: 0 0 4px; font: 700 16px "Manrope", sans-serif; }
+.student-course h3 { margin: 0 0 4px; font: 700 16px "Rethink Sans", sans-serif; }
 .student-course-top div > span { color: var(--muted); font-size: 10px; }
-.course-rate { flex: 0 0 auto; color: #47745d; font: 800 22px "Manrope", sans-serif; }
+.course-rate { flex: 0 0 auto; color: #47745d; font: 800 22px "Rethink Sans", sans-serif; }
 .course-rate.rate-warning { color: #a36d18; }
 .course-rate.rate-risk { color: var(--coral); }
 .course-progress-track { height: 7px; overflow: hidden; margin: 19px 0 12px; border-radius: 5px; background: #eadfe1; }
@@ -245,7 +245,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .course-attendance-detail time { white-space: nowrap; }
 .course-attendance-detail > p { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
 .notice-minimum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 15px; margin-bottom: 14px; padding: 14px 17px; border-left: 3px solid var(--gold); background: #fff7df; }
-.notice-minimum strong { font: 700 13px "Manrope", sans-serif; }
+.notice-minimum strong { font: 700 13px "Rethink Sans", sans-serif; }
 .notice-minimum span { color: var(--ink-soft); font-size: 11px; }
 .notice-list { display: grid; gap: 9px; }
 .notice-item { display: flex; gap: 12px; padding: 16px; border: 1px solid var(--line); background: white; }
@@ -273,7 +273,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .student-picker p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; }
 .admin-course-form > .button { justify-self: start; }
 .admin-course-list { margin-top: 27px; }
-.admin-course-list h3, .notice-compose h3, .notice-history h3, .automatic-alerts h3 { margin: 0; font: 700 15px "Manrope", sans-serif; }
+.admin-course-list h3, .notice-compose h3, .notice-history h3, .automatic-alerts h3 { margin: 0; font: 700 15px "Rethink Sans", sans-serif; }
 .admin-course-item { border-top: 1px solid var(--line); }
 .admin-course-item:last-child { border-bottom: 1px solid var(--line); }
 .admin-course-item > summary { display: flex; justify-content: space-between; gap: 15px; padding: 15px 3px; cursor: pointer; list-style-position: inside; }
@@ -291,14 +291,14 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .teacher-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: center; gap: 1px; padding: 18px; background: rgba(24, 7, 10, .16); }
 .teacher-overview div { display: grid; gap: 4px; padding: 12px; border-bottom: 1px solid rgba(255,255,255,.18); }
 .teacher-overview span { color: #f1c8cf; font-size: 10px; }
-.teacher-overview strong { font: 800 24px "Manrope", sans-serif; }
+.teacher-overview strong { font: 800 24px "Rethink Sans", sans-serif; }
 .teacher-section { padding: 32px 0 36px; border-top: 1px solid var(--line); scroll-margin-top: 70px; }
 .teacher-course-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
 .teacher-course-card { min-width: 0; padding: 20px; border: 1px solid var(--line); background: white; }
 .teacher-course-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .teacher-course-title .eyebrow { margin-bottom: 5px; }
-.teacher-course-title h3 { margin: 0; font: 700 16px "Manrope", sans-serif; }
-.teacher-course-title > strong { color: #47745d; font: 800 21px "Manrope", sans-serif; }
+.teacher-course-title h3 { margin: 0; font: 700 16px "Rethink Sans", sans-serif; }
+.teacher-course-title > strong { color: #47745d; font: 800 21px "Rethink Sans", sans-serif; }
 .teacher-course-facts { display: flex; flex-wrap: wrap; gap: 7px 16px; margin: 15px 0; color: var(--muted); font-size: 10px; }
 .teacher-course-facts b { color: var(--ink); }
 .teacher-course-meta { display: grid; gap: 8px; padding: 12px 0 15px; border-top: 1px solid var(--line); }
@@ -323,7 +323,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .automatic-alerts { margin-top: 28px; }
 .automatic-alerts h3 { margin-bottom: 12px; }
 .automatic-alert { display: flex; align-items: flex-start; gap: 13px; padding: 12px 14px; border-top: 1px solid var(--line); background: white; }
-.automatic-alert > span { color: #a36d18; font: 800 15px "Manrope", sans-serif; }
+.automatic-alert > span { color: #a36d18; font: 800 15px "Rethink Sans", sans-serif; }
 .automatic-alert strong { font-size: 11px; }
 .automatic-alert p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
 .automatic-alert-risk > span { color: var(--coral); }
@@ -331,7 +331,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .teacher-metric-strip > div { display: grid; gap: 7px; padding: 18px; border-right: 1px solid var(--line); }
 .teacher-metric-strip > div:last-child { border-right: 0; }
 .teacher-metric-strip span { color: var(--muted); font-size: 10px; }
-.teacher-metric-strip strong { font: 800 24px "Manrope", sans-serif; }
+.teacher-metric-strip strong { font: 800 24px "Rethink Sans", sans-serif; }
 .teacher-metric-strip .metric-risk strong { color: var(--coral); }
 .sort-controls { display: flex; gap: 6px; }
 .sort-controls a { padding: 8px; color: var(--muted); border-bottom: 2px solid transparent; font-size: 10px; }
@@ -369,7 +369,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .state-ausente { color: #a5232c; background: #fff0eb; }
 .state-justificado { color: #946215; background: #fff5dd; }
 .session-manual-form { display: flex; align-items: center; gap: 5px; }
-.qr-caption strong { color: var(--teal); font: 700 16px "Manrope", sans-serif; }
+.qr-caption strong { color: var(--teal); font: 700 16px "Rethink Sans", sans-serif; }
 .admin-nav { position: sticky; top: 0; z-index: 5; display: flex; gap: 22px; margin: -24px 0 28px; padding: 13px 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--canvas); }
 .admin-nav a { flex: 0 0 auto; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
 .admin-nav a:hover { color: var(--teal); }
@@ -377,13 +377,13 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .admin-overview > div { display: grid; gap: 6px; padding: 18px; border-right: 1px solid var(--line); }
 .admin-overview > div:last-child { border-right: 0; }
 .admin-overview span { color: var(--muted); font-size: 10px; }
-.admin-overview strong { font: 800 25px "Manrope", sans-serif; }
+.admin-overview strong { font: 800 25px "Rethink Sans", sans-serif; }
 .admin-overview a { color: var(--teal); font-size: 10px; font-weight: 700; }
 .admin-shortcuts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 22px 0 35px; border: 1px solid var(--line); background: var(--line); }
 .admin-shortcuts a { display: grid; gap: 5px; min-height: 105px; padding: 16px; background: white; }
 .admin-shortcuts a:hover { background: #fff5f6; }
-.admin-shortcuts span { color: var(--teal); font: 800 10px "Manrope", sans-serif; }
-.admin-shortcuts strong { font: 700 14px "Manrope", sans-serif; }
+.admin-shortcuts span { color: var(--teal); font: 800 10px "Rethink Sans", sans-serif; }
+.admin-shortcuts strong { font: 700 14px "Rethink Sans", sans-serif; }
 .admin-shortcuts small { color: var(--muted); font-size: 10px; }
 .admin-hub-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, .7fr); gap: 35px; align-items: start; }
 .admin-hub-grid .form-panel { box-shadow: none; }
@@ -399,7 +399,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .admin-person-head h2 { margin: 0 0 4px; font-size: 15px; }
 .admin-person-head span { color: var(--muted); font-size: 10px; }
 .admin-person-head .text-link { align-self: center; }
-.admin-teacher-courses h3 { margin: 13px 0 5px; font: 700 11px "Manrope", sans-serif; }
+.admin-teacher-courses h3 { margin: 13px 0 5px; font: 700 11px "Rethink Sans", sans-serif; }
 .admin-teacher-course, .admin-profile-course { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
 .admin-teacher-course > div, .admin-profile-course > div { min-width: 0; }
 .admin-teacher-course strong, .admin-teacher-course span, .admin-profile-course strong, .admin-profile-course span { display: block; }
@@ -417,7 +417,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .admin-report-chart { margin: 20px 0 28px; padding: 22px; border: 1px solid var(--line); background: white; }
 .report-bar-row { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(80px, 2fr) 42px; align-items: center; gap: 12px; margin: 12px 0; }
 .report-bar-row > span { overflow: hidden; color: var(--ink-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.report-bar-row > strong { font: 700 10px "Manrope", sans-serif; text-align: right; }
+.report-bar-row > strong { font: 700 10px "Rethink Sans", sans-serif; text-align: right; }
 .report-bar-track { height: 9px; overflow: hidden; background: #eadfe1; }
 .report-bar-track i { display: block; height: 100%; background: #47745d; }
 .report-bar-track i.bar-watch { background: var(--gold); }
@@ -427,14 +427,14 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .scanner-head { display: flex; align-items: center; justify-content: space-between; }
 .scanner-head h2 { margin: 0; font-size: 19px; }
 #qr-reader { width: min(100%, 420px); margin: 20px auto 10px; border: 0 !important; }
-#qr-reader video { border-radius: 3px; }
+#qr-reader video { width: 100%; max-height: 420px; object-fit: cover; border-radius: 3px; }
 #qr-reader__dashboard_section_csr button { min-height: 38px; padding: 0 12px; color: white; border: 0; border-radius: 3px; background: var(--teal); }
 .scanner-message { margin: 10px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
 .scan-submit { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--line); }
 .scan-submit span { color: var(--ink-soft); font-size: 12px; }
 .checkin-wrap { width: min(440px, 100%); margin: 8vh auto 0; padding: 35px; text-align: center; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
 .checkin-mark { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 18px; color: var(--teal); background: #fbe7ea; border-radius: 50%; font-size: 24px; }
-.checkin-wrap h1 { margin: 0 0 9px; font: 800 25px "Manrope", sans-serif; }
+.checkin-wrap h1 { margin: 0 0 9px; font: 800 25px "Rethink Sans", sans-serif; }
 .checkin-wrap .muted { margin-bottom: 25px; }
 .checkin-back { margin: 21px 0 0; }
 .register-link { margin: 19px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
@@ -458,7 +458,7 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .register-intro { position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; padding: 44px clamp(28px, 6vw, 80px); color: white; background: var(--teal-dark); }
 .register-intro::after { position: absolute; right: -130px; bottom: -40px; width: 310px; height: 310px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 50%; box-shadow: 0 0 0 38px rgba(255, 255, 255, .07), 0 0 0 76px rgba(255, 255, 255, .04); content: ""; }
 .register-intro .eyebrow { position: relative; z-index: 1; margin: auto 0 12px; color: var(--lime); }
-.register-intro h1 { position: relative; z-index: 1; margin: 0 0 15px; font: 800 45px/1.08 "Manrope", sans-serif; }
+.register-intro h1 { position: relative; z-index: 1; margin: 0 0 15px; font: 800 45px/1.08 "Rethink Sans", sans-serif; }
 .register-intro > p:last-child { position: relative; z-index: 1; max-width: 330px; margin: 0 auto 50px 0; color: #f2dadd; font-size: 14px; line-height: 1.7; }
 .register-panel { display: grid; place-items: center; padding: 35px; background: radial-gradient(ellipse at 100% 0%, #fff0f2 0, transparent 32%), #fffafa; }
 .register-form-wrap { width: min(420px, 100%); }
@@ -823,3 +823,181 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+/* Institutional identity: San Pablo, red and gold. */
+:root { --canvas: #f4f6f9; --ink: #203043; --ink-soft: #475569; --muted: #728093; --line: #e3e8ef; --brand-red: #ac1530; --brand-red-deep: #861026; --gold: #cfb56e; }
+h1, h2, .brand strong { font-family: var(--font-body); }
+.header-brand-image { width: 58px; height: 42px; object-fit: cover; border-radius: 5px; }
+.institution-sidebar { position: fixed; inset: 0 auto 0 0; width: 244px; background: #192a3b; color: #f8fafc; z-index: 20; display: flex; flex-direction: column; padding: 22px 16px; overflow-y: auto; }
+.sidebar-brand { display: block; margin: -6px -4px 16px; }
+.sidebar-brand img { display: block; width: 100%; border-radius: 8px; }
+.sidebar-caption { margin: 0 12px 24px; padding-bottom: 20px; border-bottom: 1px solid #ffffff18; color: #d4bc7a; font-size: 10px; letter-spacing: .13em; }
+.admin-layout .institution-sidebar .admin-nav { position: static; display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; overflow: visible; border: 0; background: transparent; box-shadow: none; }
+.admin-layout .institution-sidebar .admin-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 16px; color: #dbe3ec; font-size: 13px; font-weight: 500; border-left: 3px solid transparent; }
+.admin-layout .institution-sidebar .admin-nav a:hover { background: #ffffff0c; color: white; }
+.admin-layout .institution-sidebar .admin-nav a[aria-current="page"] { background: #ffffff12; color: #f2d895; border-left-color: #d4bc7a; }
+.sidebar-footer { margin-top: auto; padding: 28px 12px 0; font-size: 12px; color: #e2e8f0; }
+.sidebar-footer small { display: block; margin-top: 6px; color: #91a2b5; font-size: 11px; }
+.admin-layout .topbar { margin-left: 244px; padding: 0 32px; height: 76px; }
+.admin-layout .topbar .brand { font-size: 12px; }
+.admin-layout .topbar .brand small { color: var(--muted); }
+.admin-layout .page-shell { margin: 0 0 0 244px; width: calc(100% - 244px); max-width: none; padding: 34px 32px 64px; }
+.admin-layout .page-heading h1 { font-size: 28px; }
+.admin-overview { gap: 16px; border: 0; background: transparent; box-shadow: none; overflow: visible; margin-bottom: 24px; }
+.admin-overview > div, .admin-overview > div:first-child { padding: 22px; background: white; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 25px #20304308; }
+.admin-overview strong { font-family: var(--font-body); font-size: 30px; }
+.admin-overview span { font-size: 12px; }
+.admin-overview a { font-size: 11px; }
+.admin-shortcuts { margin-bottom: 24px; }
+.admin-data-section { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 24px; box-shadow: var(--shadow-sm); }
+.admin-hub-grid { gap: 20px; }
+.admin-data-section th { background: #f8fafc; padding-top: 12px; }
+.login-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.login-aside { background: #192d41; padding: 44px clamp(28px, 5vw, 80px); border-bottom: 3px solid var(--gold); }
+.login-brand-image { display: block; width: min(320px, 100%); border-radius: 8px; }
+.aside-copy { margin: auto 0; padding: 44px 0; }
+.aside-copy h1 { font-size: clamp(32px, 3.6vw, 52px); }
+.aside-copy .eyebrow, .aside-index b { color: #e0c781; }
+.aside-copy > p:last-child { max-width: 420px; color: #c9d5e1; }
+.aside-index { color: #a6b5c6; }
+.login-panel { background: #f4f6f9; }
+.login-form-wrap { width: min(420px, 100%); padding: 36px; border: 1px solid var(--line); border-top: 3px solid var(--gold); border-radius: 14px; background: white; box-shadow: 0 15px 45px #2030430c; }
+.login-form-wrap h2 { font-size: 27px; }
+.login-form-wrap .eyebrow { font-size: 9px; letter-spacing: .08em; }
+.stack-form input, .stack-form select { background: white; }
+.auth-shell > .flash-stack { position: relative; margin: 0; padding: 16px 24px; background: white; }
+@media (max-width: 1050px) { .admin-layout .topbar-user { gap: 8px; } .admin-layout .topbar .brand { display: none; } .admin-layout .topbar { justify-content: flex-end; } .admin-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+ .institution-sidebar { position: relative; width: 100%; padding: 16px; }
+ .sidebar-brand { width: 170px; margin: 0 auto 12px; }
+ .sidebar-caption, .sidebar-footer { display: none; }
+ .admin-layout .institution-sidebar .admin-nav { flex-direction: row; overflow-x: auto; gap: 4px; }
+ .admin-layout .institution-sidebar .admin-nav a { min-height: 40px; padding: 0 12px; font-size: 12px; }
+ .admin-layout .topbar { margin-left: 0; padding: 0 16px; height: auto; min-height: 64px; }
+ .admin-layout .page-shell { margin-left: 0; width: 100%; padding: 24px 16px 48px; }
+ .login-layout { grid-template-columns: 1fr; }
+ .login-aside { min-height: auto; padding: 24px; }
+ .login-brand-image { width: 200px; }
+ .aside-copy { padding: 28px 0; }
+ .aside-copy h1 { font-size: 30px; }
+ .aside-index { display: none; }
+ .login-panel { padding: 24px 16px 40px; }
+ .login-form-wrap { padding: 26px; }
+ .admin-overview { gap: 10px; }
+ .admin-overview > div { padding: 16px; }
+}
+
+/* Typography inspired by the supplied university header. */
+:root { --font-body: "Rethink Sans", "Segoe UI", Arial, sans-serif; }
+.admin-layout .institution-sidebar .admin-nav a { font-weight: 600; }
+
+/* Unified independent portal for all roles. */
+.register-intro { background: #192d41; border-bottom: 3px solid var(--gold); }
+.register-intro > p { color: #d4dce6; }
+.register-panel { background: #f4f6f9; }
+.teacher-nav, .student-nav { display: none; }
+.student-welcome { background: #192d41; }
+.student-welcome h1, .student-welcome p { color: white; }
+.student-welcome .eyebrow { color: #e0c781; }
+
+/* Colors and original logo taken from https://uspg.edu.gt/site/ */
+:root { --brand-red: #AA182B; --brand-red-deep: #841321; --teal: #AA182B; --teal-dark: #841321; --gold: #AA182B; --ink: #011931; --font-body: "Rethink Sans", "Segoe UI", Arial, sans-serif; }
+.institution-sidebar, .login-aside, .register-intro, .student-welcome { background: #011931; }
+.institution-sidebar { border-top: 7px solid #AA182B; }
+.sidebar-brand { padding: 16px 4px; margin: 0 0 16px; }
+.sidebar-brand img { width: 100%; height: auto; border-radius: 0; object-fit: contain; }
+.login-brand-image { width: min(360px, 100%); height: auto; border-radius: 0; }
+.admin-layout .topbar { border-top: 7px solid #AA182B; height: 83px; }
+.header-brand-image { width: 108px; height: auto; object-fit: contain; background: #011931; border-radius: 0; padding: 8px; }
+.sidebar-caption, .aside-copy .eyebrow, .aside-index b, .student-welcome .eyebrow { color: #fff; }
+.admin-layout .institution-sidebar .admin-nav a[aria-current="page"] { background: #AA182B; color: white; border-left-color: white; }
+.admin-layout .institution-sidebar .admin-nav a:hover { background: #ffffff14; color: white; }
+.login-aside, .register-intro { border-bottom-color: #AA182B; }
+.login-form-wrap { border-top-color: #AA182B; }
+.student-welcome { border-top: 4px solid #AA182B; }
+@media(max-width:760px) { .sidebar-brand { width: 220px; padding: 6px 0; } .login-brand-image { width: 260px; } .admin-layout .topbar { height: auto; } }
+
+/* Authentication layouts: equal desktop columns and centered recovery. */
+.login-layout > * { min-width: 0; }
+.password-recovery-panel {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 32px 20px;
+  display: grid;
+  place-items: center;
+}
+.password-recovery-panel .login-form-wrap { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .password-recovery-panel { min-height: 100dvh; padding: 24px 16px; }
+}
+
+/* Override later general page widths and padding on authentication screens. */
+.page-shell.auth-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Match the institutional access and recovery reference. */
+.login-layout .login-panel, .password-recovery-panel { background: #edf2f3; }
+.login-layout .login-form-wrap, .recovery-card {
+  border-radius: 10px;
+  border-top: 3px solid #851724;
+  box-shadow: 0 9px 24px rgba(17, 34, 48, .08);
+}
+.login-layout h1, .login-form-wrap h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+}
+.login-layout .aside-copy h1 { max-width: 390px; }
+.recovery-card { width: min(420px, 100%); padding: 32px; }
+.recovery-brand-image {
+  display: block;
+  width: min(245px, 85%);
+  height: auto;
+  margin: 0 auto 28px;
+}
+.recovery-card h2 { font-size: clamp(24px, 3vw, 30px); }
+.recovery-description { margin: 0 0 42px; line-height: 1.6; }
+.recovery-card .stack-form input { min-height: 44px; }
+.recovery-card .stack-form button { margin-top: 10px; }
+.recovery-card .login-note { margin-top: 34px; }
+.recovery-back { text-align: center; font-size: 12px; margin: 16px 0 0; }
+@media (max-width: 760px) {
+  .recovery-card { padding: 28px 24px; }
+}
+
+/* Public event attendance and reports */
+.expo-public { max-width: 660px; margin: 0 auto; padding: 36px 20px; }
+.expo-intro { margin-bottom: 24px; }
+.expo-intro img { width: 200px; max-width: 100%; margin-bottom: 24px; }
+.expo-public textarea { width: 100%; font: inherit; border: 1px solid var(--line); padding: 12px; border-radius: 4px; resize: vertical; }
+.expo-consent { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; }
+.expo-consent input { width: 18px; min-height: 18px; flex-shrink: 0; margin-top: 3px; }
+.expo-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.expo-stats strong { font-size: 38px; color: var(--teal); }
+.expo-qr { display: flex; align-items: center; gap: 24px; margin-bottom: 24px; }
+.expo-qr img { flex-shrink: 0; }
+.expo-qr a { overflow-wrap: anywhere; }
+.expo-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 16px 0; }
+.expo-text { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 180px; max-width: 350px; }
+@media (max-width: 760px) {
+  .expo-stats { grid-template-columns: repeat(2, 1fr); }
+  .expo-qr { flex-direction: column; align-items: flex-start; }
+  .expo-public { padding: 24px 16px; }
+}
+
+/* Dedicated Expo entry, separate from the academic login form */
+.expo-entry-card { margin-bottom: 28px; padding: 24px; border: 1px solid #dbe1e8; border-top: 4px solid #aa182b; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(1,25,49,.06); }
+.expo-entry-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.expo-entry-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: #f9edef; color: #aa182b; font-size: 24px; }
+.expo-entry-badge { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #52616f; }
+.expo-entry-card h2 { margin: 0 0 8px; font-size: 24px; color: #011931; }
+.expo-entry-card p { margin: 0 0 18px; color: #52616f; font-size: 14px; line-height: 1.5; }
+.expo-entry-button { background: #aa182b; border-color: #aa182b; min-height: 48px; border-radius: 6px; }
+.expo-entry-button:hover { background: #861322; border-color: #861322; }
+.expo-entry-card small { display: block; margin-top: 12px; font-size: 11px; line-height: 1.5; color: #52616f; text-align: center; }
+.login-access-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 25px; color: #687786; font-size: 9px; font-weight: 800; letter-spacing: .7px; }
+.login-access-divider::before, .login-access-divider::after { content: ""; height: 1px; background: #dbe1e8; flex: 1; }
+@media (max-width: 600px) { .expo-entry-card { padding: 20px; } .expo-entry-button { font-size: 12px; } }
