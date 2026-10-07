@@ -17,7 +17,7 @@ python -m pip install -r requirements.txt
 python iniciar.py --demo
 ```
 Abre http://127.0.0.1:5000
-Cuentas demo: admin@demo.uspg / docente@demo.uspg / alumno@demo.uspg
+Cuentas demo: admin@administrador.uspg.edu.gt / docente@catedratico.uspg.edu.gt / alumno@alumno.uspg.edu.gt
 Contraseña común: Demo-USPG-2026!
 El modo demo usa una base separada y crea un curso con docente y alumno.
 No contiene asistencias inventadas: registra las tuyas al probar.
@@ -43,3 +43,8 @@ Pruebas: python -m pytest -q.
 Pruebas de navegador: Playwright con Chromium.
 
 Motor original: https://github.com/djpinedao-progra/Programa_Asistencia_USPG
+
+
+## Rama Luis independiente
+
+Consulta [LUIS-INDEPENDIENTE.md](LUIS-INDEPENDIENTE.md) para iniciar en una carpeta nueva y configurar una base propia. La Expo permite registro sin iniciar sesión y reportes administrativos; consulta [EXPO-SAN-PABLO.md](EXPO-SAN-PABLO.md).
