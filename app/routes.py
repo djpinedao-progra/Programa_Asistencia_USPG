@@ -85,7 +85,13 @@ def login():
         identifier = request.form.get("identifier", "").strip()
         password = request.form.get("password", "")
         user = UserRepository().find_by_login_identifier(identifier)
-        if user and user.check_password(password):
+        from app.recovery import authenticate
+
+        if (
+            user
+            and UserService.email_role(user.email) == user.role
+            and authenticate(user, password)
+        ):
             login_user(user)
             next_url = request.args.get("next", "")
             if next_url.startswith("/") and not next_url.startswith("//"):
@@ -1050,6 +1056,16 @@ def _owned_attendance_session(session_id):
     return attendance_session
 
 
+def _remove_teacher_qr_token(session_id):
+    tokens = session.get("teacher_qr_tokens", {})
+    if str(session_id) in tokens:
+        tokens.pop(str(session_id), None)
+        if tokens:
+            session["teacher_qr_tokens"] = tokens
+        else:
+            session.pop("teacher_qr_tokens", None)
+
+
 def _save_teacher_qr_token(attendance_session):
     raw_token = secrets.token_urlsafe(32)
     attendance_session.token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -1147,15 +1163,14 @@ def teacher_students():
         abort(404)
     selected_courses = [selected_course] if selected_course else courses
     metrics = [_teacher_course_metrics(course) for course in selected_courses]
-    students = []
-    seen = set()
-    for course_metrics in metrics:
-        for row in course_metrics["students"]:
-            student_id = row["student"].id
-            if student_id not in seen:
-                seen.add(student_id)
-                students.append({**row, "course": course_metrics["course"]})
-    students.sort(key=lambda row: row["student"].name.casefold())
+    students = [
+        {**row, "course": course_metrics["course"]}
+        for course_metrics in metrics
+        for row in course_metrics["students"]
+    ]
+    students.sort(
+        key=lambda row: (row["student"].name.casefold(), row["course"].name.casefold())
+    )
     return render_template(
         "teacher_students.html",
         courses=courses,
@@ -1230,7 +1245,7 @@ def correct_attendance_record(attendance_id):
     attendance.status = status
     attendance.source = "manual"
     attendance.modified_by_id = current_user.id
-    attendance.recorded_at = datetime.now(timezone.utc)
+    attendance.modified_at = datetime.now(timezone.utc)
     AuditService.record(
         current_user.id, "attendance_corrected", "attendance", attendance.id,
         {
@@ -1319,6 +1334,7 @@ def _start_attendance_session(course_id):
                 )
         existing_session.active = False
         existing_session.closed_at = now
+        _remove_teacher_qr_token(existing_session.id)
         db.session.commit()
         _create_low_attendance_notices(existing_session.course)
     try:
@@ -1468,10 +1484,12 @@ def set_session_attendance(session_id, student_id):
             recorded_at=now,
         )
         db.session.add(attendance)
+        db.session.flush()
+    else:
+        attendance.modified_at = now
     attendance.status = status
     attendance.source = "manual"
     attendance.modified_by_id = current_user.id
-    attendance.recorded_at = now
     AuditService.record(
         current_user.id, "attendance_corrected", "attendance", attendance.id,
         {
@@ -1512,6 +1530,7 @@ def close_attendance_session(session_id):
             )
     attendance_session.active = False
     attendance_session.closed_at = now
+    _remove_teacher_qr_token(attendance_session.id)
     db.session.commit()
     _create_low_attendance_notices(attendance_session.course)
     flash("Asistencia cerrada; las faltas pendientes quedaron registradas.", "success")
@@ -1559,6 +1578,7 @@ def student_dashboard():
             "course": course,
             "total_sessions": 0,
             "attended_count": 0,
+            "justified_count": 0,
             "attendance_records": [],
         }
         for course in student_courses
@@ -1571,6 +1591,7 @@ def student_dashboard():
                 "course": course,
                 "total_sessions": 0,
                 "attended_count": 0,
+                "justified_count": 0,
                 "attendance_records": [],
             },
         )
@@ -1578,11 +1599,14 @@ def student_dashboard():
         attendance = attendance_by_session.get(attendance_session.id)
         if attendance:
             progress["attended_count"] += attendance.status == "presente"
+            progress["justified_count"] += attendance.status == "justificado"
             progress["attendance_records"].append(attendance)
 
     courses = sorted(course_progress.values(), key=lambda item: item["course"].name)
     for course in courses:
-        course["absence_count"] = course["total_sessions"] - course["attended_count"]
+        course["absence_count"] = (
+            course["total_sessions"] - course["attended_count"] - course["justified_count"]
+        )
         course["percentage"] = round(
             course["attended_count"] / course["total_sessions"] * 100
         ) if course["total_sessions"] else 0
@@ -1617,7 +1641,8 @@ def student_dashboard():
         courses=courses,
         total_sessions=total_sessions,
         total_attended=total_attended,
-        total_absences=total_sessions - total_attended,
+        total_absences=sum(course["absence_count"] for course in courses),
+        total_justified=sum(course["justified_count"] for course in courses),
         overall_percentage=overall_percentage,
         notices=notices,
         received_notices=received_notices,
@@ -1753,3 +1778,23 @@ def export_attendance_pdf(course_id):
         as_attachment=True,
         download_name=f"asistencias-{course.code}.pdf",
     )
+
+@main.route("/recuperar-contrasena", methods=["GET", "POST"])
+def recover_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.dashboard"))
+    if request.method == "POST":
+        from app.recovery import request_replacement
+
+        email = request.form.get("email", "").strip().lower()
+        if not UserService.email_role(email):
+            flash("Ingresa un correo institucional de alumno, catedrático o administrador.", "error")
+        else:
+            request_replacement(email)
+            flash(
+                "Si el correo pertenece a una cuenta, recibirás una contraseña temporal. "
+                "Revisa también la carpeta de correo no deseado.",
+                "success",
+            )
+            return redirect(url_for("main.login"))
+    return render_template("recover_password.html")

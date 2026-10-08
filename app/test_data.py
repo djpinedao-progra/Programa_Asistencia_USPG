@@ -16,16 +16,31 @@ from app.models import (
 
 TEST_PASSWORD = "123"
 
+ADMIN_EMAIL = "admin@administrador.uspg.edu.gt"
+TEACHER_EMAIL = "docente@catedratico.uspg.edu.gt"
+
+
+def student_email(number):
+    return f"alumno{number}@alumno.uspg.edu.gt"
+
+
 TEST_USERS = [
-    ("Administrador Demo", "admin@uspg.edu", "admin", None),
-    ("Carlos Méndez", "docente@uspg.edu", "docente", None),
-    ("Ana López", "alumno1@uspg.edu", "alumno", "2600010"),
-    ("Luis Pérez", "alumno2@uspg.edu", "alumno", "2600011"),
-    ("María García", "alumno3@uspg.edu", "alumno", "2600012"),
-    ("Carlos Morales", "alumno4@uspg.edu", "alumno", "2600013"),
-    ("José Hernández", "alumno5@uspg.edu", "alumno", "2600014"),
-    ("Sofía Castillo", "alumno6@uspg.edu", "alumno", "2600015"),
+    ("Administrador Demo", ADMIN_EMAIL, "admin", None),
+    ("Carlos Méndez", TEACHER_EMAIL, "docente", None),
+    ("Ana López", student_email(1), "alumno", "2600010"),
+    ("Luis Pérez", student_email(2), "alumno", "2600011"),
+    ("María García", student_email(3), "alumno", "2600012"),
+    ("Carlos Morales", student_email(4), "alumno", "2600013"),
+    ("José Hernández", student_email(5), "alumno", "2600014"),
+    ("Sofía Castillo", student_email(6), "alumno", "2600015"),
 ]
+
+# Earlier versions used @uspg.edu; those accounts are renamed so their data is kept.
+LEGACY_EMAILS = {
+    "admin@uspg.edu": ADMIN_EMAIL,
+    "docente@uspg.edu": TEACHER_EMAIL,
+    **{f"alumno{number}@uspg.edu": student_email(number) for number in range(1, 7)},
+}
 
 TEST_COURSES = [
     ("Programación de Sistemas II", "ING-220", "Lunes y miércoles, 10:00–12:00", "presencial", "Aula 204"),
@@ -36,15 +51,15 @@ TEST_COURSES = [
 SESSIONS_PER_COURSE = 10
 # Session numbers each student misses in every course; gives 100, 90, 80, 63, 70 and 90 percent.
 ABSENT_SESSIONS = {
-    "alumno1@uspg.edu": set(),
-    "alumno2@uspg.edu": {2},
-    "alumno3@uspg.edu": {1, 4},
-    "alumno4@uspg.edu": {0, 3, 6},
-    "alumno5@uspg.edu": {1, 5},
-    "alumno6@uspg.edu": {7},
+    student_email(1): set(),
+    student_email(2): {2},
+    student_email(3): {1, 4},
+    student_email(4): {0, 3, 6},
+    student_email(5): {1, 5},
+    student_email(6): {7},
 }
-EXTRA_ABSENCES = {("ING-222", "alumno4@uspg.edu"): {8, 9}}
-JUSTIFIED_SESSIONS = {"alumno5@uspg.edu": {9}}
+EXTRA_ABSENCES = {("ING-222", student_email(4)): {8, 9}}
+JUSTIFIED_SESSIONS = {student_email(5): {9}}
 
 # Account created by the first version of seed-test-users; removed so teams don't keep it.
 LEGACY_TEST_STUDENT = ("alumno@uspg.edu", "Alumno de prueba", "2600001")
@@ -65,12 +80,24 @@ def _remove_legacy_test_student():
     return f"{email}: cuenta de prueba anterior eliminada"
 
 
+def _rename_legacy_emails():
+    messages = []
+    for old_email, new_email in LEGACY_EMAILS.items():
+        user = db.session.scalar(select(User).where(User.email == old_email))
+        if user and not db.session.scalar(select(User).where(User.email == new_email)):
+            user.email = new_email
+            messages.append(f"{old_email}: renombrada a {new_email}")
+    db.session.flush()
+    return messages
+
+
 def seed_test_data():
     """Create or reset the shared test accounts, courses and attendance history."""
     messages = []
     removed = _remove_legacy_test_student()
     if removed:
         messages.append(removed)
+    messages.extend(_rename_legacy_emails())
     users = {}
     for name, email, role, carnet in TEST_USERS:
         user = db.session.scalar(select(User).where(User.email == email))
@@ -97,7 +124,7 @@ def seed_test_data():
         messages.append(f"{email} ({role}): {action}")
     db.session.flush()
 
-    teacher = users["docente@uspg.edu"]
+    teacher = users[TEACHER_EMAIL]
     students = [users[email] for _, email, role, _ in TEST_USERS if role == "alumno"]
     now = datetime.now(timezone.utc)
     for index, (name, code, schedule, location_type, classroom) in enumerate(TEST_COURSES):

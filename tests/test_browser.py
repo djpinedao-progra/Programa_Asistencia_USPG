@@ -55,15 +55,15 @@ def sign_in(page, base_url, identifier):
 def test_admin_imports_enrollments_in_browser(app, browser_page, tmp_path):
     page, base_url = browser_page
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumna", "alumna@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(name="Programación", code="INF-101", teacher_id=teacher.id)
         db.session.add(course)
         db.session.commit()
         course_id, student_id = course.id, student.id
 
-    sign_in(page, base_url, "admin@uspg.edu")
+    sign_in(page, base_url, "admin@administrador.uspg.edu.gt")
     page.goto(f"{base_url}/admin/cursos/importar")
     source_file = tmp_path / "matriculas.csv"
     source_file.write_text("course_code,carnet\nINF-101,2600403\nBAD-101,0000000\n", encoding="utf-8")
@@ -89,8 +89,8 @@ def test_admin_imports_enrollments_in_browser(app, browser_page, tmp_path):
 def test_teacher_starts_attendance_and_sees_live_sync_in_browser(app, browser_page):
     page, base_url = browser_page
     with app.app_context():
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumna", "alumna@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(
             name="Historia", code="HIS-101", teacher_id=teacher.id,
             schedule="Lunes 08:00-09:30",
@@ -101,7 +101,7 @@ def test_teacher_starts_attendance_and_sees_live_sync_in_browser(app, browser_pa
         db.session.commit()
         course_id = course.id
 
-    sign_in(page, base_url, "docente@uspg.edu")
+    sign_in(page, base_url, "docente@catedratico.uspg.edu.gt")
     page.locator(".sidebar-nav").get_by_role("link", name="Tomar asistencia").click()
     page.locator("#attendance-course").select_option(str(course_id))
     page.get_by_role("button", name="Iniciar asistencia").click()

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Asistencia · Expo San Pablo{% endblock %}
+{% block content %}
+<section class="login-layout expo-layout">
+  <div class="login-aside">
+    <div class="brand brand-light"><img class="brand-logo brand-logo-lg" src="{{ url_for('static', filename='img/uspg-logo.jpg') }}" alt="" width="384" height="384"><span class="brand-text"><strong>Universidad San Pablo</strong><small>Guatemala</small></span></div>
+    <div class="aside-copy">
+      <p class="eyebrow">EXPO SAN PABLO</p>
+      <h1>Tu participación cuenta.</h1>
+      <p>Registra tu asistencia y comparte tu experiencia. Sin cuenta ni contraseña.</p>
+    </div>
+    <span class="aside-index">REGISTRO PÚBLICO <b>USPG</b></span>
+  </div>
+  <div class="login-panel">
+    <div class="auth-card expo-card">
+      {% if registered %}
+      <div class="expo-done">
+        <div class="checkin-mark" aria-hidden="true">✓</div>
+        <h2>¡Registro completado!</h2>
+        <p class="muted">Gracias por ser parte de la Expo San Pablo.</p>
+        <a class="button button-outline button-wide" href="{{ url_for('expo.registration') }}">Registrar a otra persona</a>
+      </div>
+      {% else %}
+      <p class="eyebrow">REGISTRO DE ASISTENCIA</p>
+      <h2>Expo San Pablo</h2>
+      <p class="muted">Completa tus datos para registrar tu asistencia.</p>
+      <form method="post" class="stack-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="expo-name">Nombre completo</label>
+        <input id="expo-name" name="name" autocomplete="name" required minlength="2" maxlength="120" value="{{ values.get('name', '') }}">
+        <label for="expo-email">Correo electrónico</label>
+        <input id="expo-email" name="email" type="email" autocomplete="email" required maxlength="254" value="{{ values.get('email', '') }}" aria-describedby="expo-email-help">
+        <span class="field-hint" id="expo-email-help">Aceptamos correos personales e institucionales de cualquier proveedor.</span>
+        <label for="expo-category">¿Cómo participas en el evento?</label>
+        <select id="expo-category" name="category" required><option value="">Selecciona tu categoría</option>{% for key, label in categories.items() %}<option value="{{ key }}" {% if values.get('category') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <label for="expo-participation">Tu participación</label>
+        <textarea id="expo-participation" name="participation" required maxlength="500" rows="3" placeholder="Por ejemplo: visitante, expositor o participante de un taller.">{{ values.get('participation', '') }}</textarea>
+        <label for="expo-opinion">Tu opinión del evento <span class="optional-label">(opcional)</span></label>
+        <textarea id="expo-opinion" name="opinion" maxlength="2000" rows="4" placeholder="¿Qué te gustó y qué podemos mejorar?">{{ values.get('opinion', '') }}</textarea>
+        <label class="expo-consent"><input type="checkbox" name="consent" value="yes" required {% if values.get('consent') == 'yes' %}checked{% endif %}><span>Autorizo el uso de estos datos para el control de asistencia y el reporte de la Expo San Pablo. Solo el administrador podrá consultar mis datos y opinión.</span></label>
+        <button class="button button-primary button-wide" type="submit">Registrar mi asistencia <span aria-hidden="true">→</span></button>
+        <span class="field-hint">Se cuenta una asistencia por correo. La categoría la declara cada participante.</span>
+      </form>
+      {% endif %}
+      <p class="register-link"><a href="{{ url_for('main.login') }}">Ir al inicio de sesión</a></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

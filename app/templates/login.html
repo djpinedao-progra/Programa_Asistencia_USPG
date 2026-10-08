@@ -12,6 +12,13 @@
     <span class="aside-index">CAMPUS DIGITAL <b>USPG</b></span>
   </div>
   <div class="login-panel">
+    <div class="auth-stack">
+    <a class="expo-entry-card" href="{{ url_for('expo.registration') }}">
+      <span class="expo-entry-badge">ACCESO PÚBLICO</span>
+      <strong>Expo San Pablo</strong>
+      <span>Registrar asistencia a la Expo, sin iniciar sesión</span>
+      <span class="expo-entry-arrow" aria-hidden="true">→</span>
+    </a>
     <div class="login-form-wrap auth-card">
       <div class="auth-card-brand"><img class="brand-logo" src="{{ url_for('static', filename='img/uspg-logo.jpg') }}" alt="" width="384" height="384"><span><strong>UNIVERSIDAD SAN PABLO</strong><small>GUATEMALA</small></span></div>
       <h2>Iniciar sesión</h2>
@@ -19,12 +26,14 @@
       <form method="post" class="stack-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="identifier">Correo o carnet institucional</label>
-        <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="nombre@uspg.edu o 2600403" required autofocus>
+        <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="nombre@alumno.uspg.edu.gt o 2600403" required autofocus>
         <label for="password">Contraseña</label>
         <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Tu contraseña" required>
+        <a class="text-link forgot-link" href="{{ url_for('main.recover_password') }}">¿Olvidaste tu contraseña?</a>
         <button class="button button-primary button-wide" type="submit">Entrar <span aria-hidden="true">→</span></button>
       </form>
       <p class="login-note"><span class="status-dot"></span> Acceso protegido para la comunidad USPG</p>
+    </div>
     </div>
   </div>
 </section>

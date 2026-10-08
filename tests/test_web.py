@@ -56,15 +56,17 @@ def login(client, identifier, password="password-seguro-123"):
 
 def test_teacher_qr_flow_records_student_attendance(app):
     with app.app_context():
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumno", "alumno@uspg.edu", "alumno", "2600403")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumno", "alumno@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(name="Programación", code="INF-101", teacher_id=teacher.id)
         db.session.add(course)
+        db.session.flush()
+        db.session.add(CourseEnrollment(course_id=course.id, student_id=student.id))
         db.session.commit()
         student_id = student.id
 
     teacher_client = app.test_client()
-    login(teacher_client, "docente@uspg.edu")
+    login(teacher_client, "docente@catedratico.uspg.edu.gt")
     response = teacher_client.post(
         "/docente/cursos/1/sesion",
         data={
@@ -110,8 +112,8 @@ def test_teacher_qr_flow_records_student_attendance(app):
 
 def test_student_dashboard_calculates_course_alert_thresholds(app):
     with app.app_context():
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumno", "alumno@uspg.edu", "alumno", "2600403")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumno", "alumno@alumno.uspg.edu.gt", "alumno", "2600403")
         courses = [
             Course(name="Curso bajo", code="LOW-70", teacher_id=teacher.id),
             Course(name="Curso minimo", code="MIN-80", teacher_id=teacher.id),
@@ -168,7 +170,7 @@ def test_student_registration_forces_student_role_and_accepts_short_password(app
         data={
             "csrf_token": csrf_token,
             "name": "Nueva Alumna",
-            "email": "nueva@uspg.edu",
+            "email": "nueva@alumno.uspg.edu.gt",
             "carnet": "2600403",
             "password": "a",
             "role": "admin",
@@ -178,7 +180,7 @@ def test_student_registration_forces_student_role_and_accepts_short_password(app
 
     with app.app_context():
         user = db.session.scalar(
-            select(User).where(User.email == "nueva@uspg.edu")
+            select(User).where(User.email == "nueva@alumno.uspg.edu.gt")
         )
         assert user.role == "alumno"
         assert user.carnet == "2600403"
@@ -197,13 +199,13 @@ def test_student_registration_forces_student_role_and_accepts_short_password(app
 
 
 def test_seed_admin_accepts_short_password(app, monkeypatch):
-    monkeypatch.setenv("ADMIN_EMAIL", "short-password-admin@uspg.edu")
+    monkeypatch.setenv("ADMIN_EMAIL", "short-password-admin@administrador.uspg.edu.gt")
     monkeypatch.setenv("ADMIN_PASSWORD", "x")
     result = app.test_cli_runner().invoke(args=["seed-admin"])
     assert result.exit_code == 0
     with app.app_context():
         user = db.session.scalar(
-            select(User).where(User.email == "short-password-admin@uspg.edu")
+            select(User).where(User.email == "short-password-admin@administrador.uspg.edu.gt")
         )
         assert user.check_password("x")
 
@@ -212,7 +214,7 @@ def test_seed_test_users_creates_shared_data_once_and_resets_passwords(app):
     runner = app.test_cli_runner()
     assert runner.invoke(args=["seed-test-users"]).exit_code == 0
     with app.app_context():
-        alumno = db.session.scalar(select(User).where(User.email == "alumno4@uspg.edu"))
+        alumno = db.session.scalar(select(User).where(User.email == "alumno4@alumno.uspg.edu.gt"))
         alumno.set_password("otra")
         db.session.commit()
 
@@ -220,16 +222,16 @@ def test_seed_test_users_creates_shared_data_once_and_resets_passwords(app):
     with app.app_context():
         users = {
             user.email: user
-            for user in db.session.scalars(select(User).where(User.email.like("%@uspg.edu")))
+            for user in db.session.scalars(select(User).where(User.email.like("%.uspg.edu.gt")))
         }
         assert {email: user.role for email, user in users.items()} == {
-            "admin@uspg.edu": "admin",
-            "docente@uspg.edu": "docente",
-            **{f"alumno{i}@uspg.edu": "alumno" for i in range(1, 7)},
+            "admin@administrador.uspg.edu.gt": "admin",
+            "docente@catedratico.uspg.edu.gt": "docente",
+            **{f"alumno{i}@alumno.uspg.edu.gt": "alumno" for i in range(1, 7)},
         }
         assert all(user.check_password("123") for user in users.values())
-        assert users["docente@uspg.edu"].name == "Carlos Méndez"
-        assert users["alumno1@uspg.edu"].carnet == "2600010"
+        assert users["docente@catedratico.uspg.edu.gt"].name == "Carlos Méndez"
+        assert users["alumno1@alumno.uspg.edu.gt"].carnet == "2600010"
         assert db.session.query(Course).count() == 3
         assert db.session.query(Attendance).count() == 3 * 10 * 6
 
@@ -239,41 +241,44 @@ def test_seed_test_users_creates_shared_data_once_and_resets_passwords(app):
             ).all()
             return round(sum(r.status == "presente" for r in records) / len(records) * 100)
 
-        assert [percentage(f"alumno{i}@uspg.edu") for i in range(1, 7)] == [100, 90, 80, 63, 70, 90]
+        assert [percentage(f"alumno{i}@alumno.uspg.edu.gt") for i in range(1, 7)] == [100, 90, 80, 63, 70, 90]
 
 
-def test_seed_test_users_replaces_previous_three_test_accounts(app):
+def test_seed_test_users_migrates_previous_uspg_edu_accounts(app):
     with app.app_context():
         for name, email, role, carnet in [
             ("Administrador", "admin@uspg.edu", "admin", None),
             ("Docente de prueba", "docente@uspg.edu", "docente", None),
             ("Alumno de prueba", "alumno@uspg.edu", "alumno", "2600001"),
+            ("Ana López", "alumno1@uspg.edu", "alumno", "2600010"),
         ]:
             user = User(name=name, email=email, role=role, carnet=carnet)
             user.set_password("123")
             db.session.add(user)
         db.session.commit()
+        ana_id = db.session.scalar(select(User.id).where(User.email == "alumno1@uspg.edu"))
 
     result = app.test_cli_runner().invoke(args=["seed-test-users"])
     assert result.exit_code == 0, result.output
 
     with app.app_context():
-        names = {
-            user.email: user.name
-            for user in db.session.scalars(select(User).where(User.email.like("%@uspg.edu")))
+        users = {user.email: user for user in db.session.scalars(select(User))}
+        assert set(users) == {
+            "admin@administrador.uspg.edu.gt",
+            "docente@catedratico.uspg.edu.gt",
+            *(f"alumno{i}@alumno.uspg.edu.gt" for i in range(1, 7)),
         }
-        assert "alumno@uspg.edu" not in names
-        assert len(names) == 8
-        assert names["admin@uspg.edu"] == "Administrador Demo"
-        assert names["docente@uspg.edu"] == "Carlos Méndez"
+        assert users["admin@administrador.uspg.edu.gt"].name == "Administrador Demo"
+        assert users["docente@catedratico.uspg.edu.gt"].name == "Carlos Méndez"
+        assert users["alumno1@alumno.uspg.edu.gt"].id == ana_id
 
 
 def test_admin_can_see_teacher_student_data_and_attendance(app):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumno", "alumno@uspg.edu", "alumno", "2600403")
-        legacy_student = create_user("Alumno anterior", "anterior@uspg.edu", "alumno")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumno", "alumno@alumno.uspg.edu.gt", "alumno", "2600403")
+        legacy_student = create_user("Alumno anterior", "anterior@alumno.uspg.edu.gt", "alumno")
         legacy_student_id = legacy_student.id
         course = Course(name="Programación", code="INF-101", teacher_id=teacher.id)
         db.session.add(course)
@@ -298,7 +303,7 @@ def test_admin_can_see_teacher_student_data_and_attendance(app):
         db.session.commit()
 
     client = app.test_client()
-    login(client, "admin@uspg.edu")
+    login(client, "admin@administrador.uspg.edu.gt")
     response = client.get("/admin")
     assert response.status_code == 200
     assert b"Resumen acad\xc3\xa9mico" in response.data
@@ -310,7 +315,7 @@ def test_admin_can_see_teacher_student_data_and_attendance(app):
     assert courses_page.status_code == 200
     assert b"2600403" in students_page.data
     assert b"Alumno anterior" in students_page.data
-    assert b"docente@uspg.edu" in teachers_page.data
+    assert b"docente@catedratico.uspg.edu.gt" in teachers_page.data
     assert b"INF-101" in courses_page.data
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', response.data
@@ -322,20 +327,20 @@ def test_admin_can_see_teacher_student_data_and_attendance(app):
     assert assign_response.status_code == 302
     with app.app_context():
         migrated_student = db.session.scalar(
-            select(User).where(User.email == "anterior@uspg.edu")
+            select(User).where(User.email == "anterior@alumno.uspg.edu.gt")
         )
         assert migrated_student.carnet == "2600404"
 
 
 def test_admin_creates_courses_and_assigns_students(app):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumno", "alumno@uspg.edu", "alumno", "2600403")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumno", "alumno@alumno.uspg.edu.gt", "alumno", "2600403")
         teacher_id, student_id = teacher.id, student.id
 
     admin_client = app.test_client()
-    login(admin_client, "admin@uspg.edu")
+    login(admin_client, "admin@administrador.uspg.edu.gt")
     admin_page = admin_client.get("/admin")
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', admin_page.data
@@ -364,7 +369,7 @@ def test_admin_creates_courses_and_assigns_students(app):
         ]
 
     teacher_client = app.test_client()
-    login(teacher_client, "docente@uspg.edu")
+    login(teacher_client, "docente@catedratico.uspg.edu.gt")
     teacher_page = teacher_client.get("/docente")
     teacher_csrf = re.search(
         rb'name="csrf_token" value="([^"]+)"', teacher_page.data
@@ -381,10 +386,10 @@ def test_admin_creates_courses_and_assigns_students(app):
 
 def test_teacher_session_renewal_close_history_and_notices(app):
     with app.app_context():
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        alice = create_user("Ana", "ana@uspg.edu", "alumno", "2600401")
-        bob = create_user("Beto", "beto@uspg.edu", "alumno", "2600402")
-        carol = create_user("Caro", "caro@uspg.edu", "alumno", "2600403")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        alice = create_user("Ana", "ana@alumno.uspg.edu.gt", "alumno", "2600401")
+        bob = create_user("Beto", "beto@alumno.uspg.edu.gt", "alumno", "2600402")
+        carol = create_user("Caro", "caro@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(
             name="Historia", code="HIS-201", teacher_id=teacher.id,
             schedule="Martes 10:00", classroom="Aula 12",
@@ -404,7 +409,7 @@ def test_teacher_session_renewal_close_history_and_notices(app):
         )
 
     teacher_client = app.test_client()
-    login(teacher_client, "docente@uspg.edu")
+    login(teacher_client, "docente@catedratico.uspg.edu.gt")
     dashboard = teacher_client.get("/docente")
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', dashboard.data
@@ -447,7 +452,7 @@ def test_teacher_session_renewal_close_history_and_notices(app):
     )
     assert checkin.status_code == 302
     teacher_client = app.test_client()
-    login(teacher_client, "docente@uspg.edu")
+    login(teacher_client, "docente@catedratico.uspg.edu.gt")
     session_page = teacher_client.get(f"/docente/sesiones/{session_id}")
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', session_page.data
@@ -514,9 +519,9 @@ def test_teacher_session_renewal_close_history_and_notices(app):
 
 def test_admin_filters_profiles_and_course_availability(app):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente Uno", "docente@uspg.edu", "docente")
-        student = create_user("Estudiante Uno", "alumno@uspg.edu", "alumno", "2600401")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente Uno", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Estudiante Uno", "alumno@alumno.uspg.edu.gt", "alumno", "2600401")
         course = Course(
             name="Química", code="QUI-101", teacher_id=teacher.id,
             schedule="Jueves 09:00", classroom="Lab 2",
@@ -528,7 +533,7 @@ def test_admin_filters_profiles_and_course_availability(app):
         student_id, teacher_id, course_id = student.id, teacher.id, course.id
 
     client = app.test_client()
-    login(client, "admin@uspg.edu")
+    login(client, "admin@administrador.uspg.edu.gt")
     students_page = client.get(f"/admin/estudiantes?q=2600401&curso={course_id}")
     assert students_page.status_code == 200
     assert b"Estudiante Uno" in students_page.data
@@ -542,7 +547,7 @@ def test_admin_filters_profiles_and_course_availability(app):
         data={
             "csrf_token": csrf_token,
             "name": "Estudiante Actualizado",
-            "email": "actualizado@uspg.edu",
+            "email": "actualizado@alumno.uspg.edu.gt",
             "carnet": "2600402",
         },
     )
@@ -550,10 +555,10 @@ def test_admin_filters_profiles_and_course_availability(app):
     with app.app_context():
         student = db.session.get(User, student_id)
         assert student.name == "Estudiante Actualizado"
-        assert student.email == "actualizado@uspg.edu"
+        assert student.email == "actualizado@alumno.uspg.edu.gt"
         assert student.carnet == "2600402"
 
-    teacher_page = client.get("/admin/docentes?q=docente%40uspg.edu")
+    teacher_page = client.get("/admin/docentes?q=docente%40catedratico.uspg.edu.gt")
     assert b"Docente Uno" in teacher_page.data
     course_page = client.get(f"/admin/cursos?docente={teacher_id}")
     assert b"QUI-101" in course_page.data
@@ -598,9 +603,9 @@ def test_admin_filters_profiles_and_course_availability(app):
 
 def test_admin_attendance_reports_and_session_pdf(app):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumna", "alumna@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(
             name="Literatura", code="LIT-101", teacher_id=teacher.id,
             schedule="Viernes 11:00", classroom="Aula 7",
@@ -635,7 +640,7 @@ def test_admin_attendance_reports_and_session_pdf(app):
         session_date = local_datetime(now).date().isoformat()
 
     client = app.test_client()
-    login(client, "admin@uspg.edu")
+    login(client, "admin@administrador.uspg.edu.gt")
     filtered_attendance = client.get(
         f"/admin/asistencias?curso={course_id}&fecha={session_date}&estudiante=2600403&riesgo=ninguno"
     )
@@ -664,16 +669,16 @@ def test_admin_attendance_reports_and_session_pdf(app):
     student_history = student_client.get("/alumno")
     assert b"28/09/2026 \xc2\xb7 20:30" in student_history.data
     teacher_client = app.test_client()
-    login(teacher_client, "docente@uspg.edu")
+    login(teacher_client, "docente@catedratico.uspg.edu.gt")
     exported = teacher_client.get(f"/api/cursos/{course_id}/asistencias.csv")
     assert b"2026-09-28T20:30:00-06:00" in exported.data
 
 
 def test_admin_imports_course_enrollments_from_csv(app):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumna", "alumna@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(name="Programación", code="INF-101", teacher_id=teacher.id)
         db.session.add(course)
         db.session.flush()
@@ -693,7 +698,7 @@ def test_admin_imports_course_enrollments_from_csv(app):
         session_id = closed_session.id
 
     client = app.test_client()
-    login(client, "admin@uspg.edu")
+    login(client, "admin@administrador.uspg.edu.gt")
     upload_page = client.get("/admin/cursos/importar")
     template = client.get("/admin/cursos/importar/plantilla.csv")
     assert template.mimetype == "text/csv"
@@ -765,8 +770,8 @@ def test_admin_imports_course_enrollments_from_csv(app):
 
 def test_users_can_change_password_and_admin_can_reset_it(app):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        student = create_user("Alumna", "alumna@alumno.uspg.edu.gt", "alumno", "2600403")
         student_id = student.id
 
     student_client = app.test_client()
@@ -802,7 +807,7 @@ def test_users_can_change_password_and_admin_can_reset_it(app):
         assert not student.check_password("password-seguro-123")
 
     admin_client = app.test_client()
-    login(admin_client, "admin@uspg.edu")
+    login(admin_client, "admin@administrador.uspg.edu.gt")
     profile = admin_client.get(f"/admin/usuarios/{student_id}/perfil")
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', profile.data
@@ -824,9 +829,9 @@ def test_users_can_change_password_and_admin_can_reset_it(app):
 
 def test_attendance_histories_paginate_and_keep_filters(app):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumna", "alumna@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(name="Programación", code="INF-101", teacher_id=teacher.id)
         db.session.add(course)
         db.session.flush()
@@ -868,7 +873,7 @@ def test_attendance_histories_paginate_and_keep_filters(app):
     assert b"Siguiente" not in student_history.data
 
     teacher_client = app.test_client()
-    login(teacher_client, "docente@uspg.edu")
+    login(teacher_client, "docente@catedratico.uspg.edu.gt")
     teacher_history = teacher_client.get(
         f"/docente/historial?curso={course_id}&estado=presente&page=2"
     )
@@ -878,7 +883,7 @@ def test_attendance_histories_paginate_and_keep_filters(app):
     assert f"curso={course_id}".encode() in teacher_history.data
 
     admin_client = app.test_client()
-    login(admin_client, "admin@uspg.edu")
+    login(admin_client, "admin@administrador.uspg.edu.gt")
     admin_history = admin_client.get(f"/admin/historial?curso={course_id}&page=2")
     assert admin_history.status_code == 200
     assert b"26 sesiones" in admin_history.data
@@ -888,9 +893,9 @@ def test_attendance_histories_paginate_and_keep_filters(app):
 
 def test_attendance_corrections_are_audited_and_admin_only(app):
     with app.app_context():
-        admin = create_user("Admin", "admin@uspg.edu", "admin")
-        teacher = create_user("Docente", "docente@uspg.edu", "docente")
-        student = create_user("Alumna", "alumna@uspg.edu", "alumno", "2600403")
+        admin = create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
+        teacher = create_user("Docente", "docente@catedratico.uspg.edu.gt", "docente")
+        student = create_user("Alumna", "alumna@alumno.uspg.edu.gt", "alumno", "2600403")
         course = Course(name="Historia", code="HIS-101", teacher_id=teacher.id)
         db.session.add(course)
         db.session.flush()
@@ -917,7 +922,7 @@ def test_attendance_corrections_are_audited_and_admin_only(app):
         attendance_id, teacher_id, admin_id = attendance.id, teacher.id, admin.id
 
     teacher_client = app.test_client()
-    login(teacher_client, "docente@uspg.edu")
+    login(teacher_client, "docente@catedratico.uspg.edu.gt")
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', teacher_client.get("/docente").data
     ).group(1).decode()
@@ -935,7 +940,7 @@ def test_attendance_corrections_are_audited_and_admin_only(app):
         assert entry.details["status"] == "presente"
 
     admin_client = app.test_client()
-    login(admin_client, "admin@uspg.edu")
+    login(admin_client, "admin@administrador.uspg.edu.gt")
     audit_page = admin_client.get("/admin/auditoria")
     assert audit_page.status_code == 200
     assert b"Attendance corrected" in audit_page.data
@@ -948,11 +953,11 @@ def test_attendance_corrections_are_audited_and_admin_only(app):
 
 def test_admin_user_creation_is_audited_in_the_same_flow(app):
     with app.app_context():
-        admin = create_user("Admin", "admin@uspg.edu", "admin")
+        admin = create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
         admin_id = admin.id
 
     client = app.test_client()
-    login(client, "admin@uspg.edu")
+    login(client, "admin@administrador.uspg.edu.gt")
     dashboard = client.get("/admin")
     csrf_token = re.search(
         rb'name="csrf_token" value="([^"]+)"', dashboard.data
@@ -962,14 +967,14 @@ def test_admin_user_creation_is_audited_in_the_same_flow(app):
         data={
             "csrf_token": csrf_token,
             "name": "Nuevo Docente",
-            "email": "nuevo@uspg.edu",
+            "email": "nuevo@catedratico.uspg.edu.gt",
             "password": "clave-inicial",
             "role": "docente",
         },
     )
     assert created.status_code == 302
     with app.app_context():
-        user = db.session.scalar(select(User).where(User.email == "nuevo@uspg.edu"))
+        user = db.session.scalar(select(User).where(User.email == "nuevo@catedratico.uspg.edu.gt"))
         entry = db.session.scalar(
             select(AuditLog).where(AuditLog.action == "user_created")
         )
@@ -981,7 +986,7 @@ def test_admin_user_creation_is_audited_in_the_same_flow(app):
 
 def test_database_backup_and_restore_round_trip(app, tmp_path):
     with app.app_context():
-        create_user("Admin", "admin@uspg.edu", "admin")
+        create_user("Admin", "admin@administrador.uspg.edu.gt", "admin")
     backup_path = tmp_path / "asistencia-backup.json.gz"
     runner = app.test_cli_runner()
     backed_up = runner.invoke(args=["backup-db", str(backup_path)])
@@ -989,14 +994,14 @@ def test_database_backup_and_restore_round_trip(app, tmp_path):
     assert backup_path.exists()
 
     with app.app_context():
-        create_user("Nuevo", "nuevo@uspg.edu", "docente")
+        create_user("Nuevo", "nuevo@catedratico.uspg.edu.gt", "docente")
         assert len(db.session.scalars(select(User)).all()) == 2
 
     restored = runner.invoke(args=["restore-db", str(backup_path), "--yes"])
     assert restored.exit_code == 0, restored.output
     with app.app_context():
         users = db.session.scalars(select(User)).all()
-        assert [user.email for user in users] == ["admin@uspg.edu"]
+        assert [user.email for user in users] == ["admin@administrador.uspg.edu.gt"]
 
     incompatible_path = tmp_path / "incompatible.json.gz"
     with gzip.open(incompatible_path, "wt", encoding="utf-8") as archive:
@@ -1007,7 +1012,7 @@ def test_database_backup_and_restore_round_trip(app, tmp_path):
     assert rejected.exit_code != 0
     with app.app_context():
         users = db.session.scalars(select(User)).all()
-        assert [user.email for user in users] == ["admin@uspg.edu"]
+        assert [user.email for user in users] == ["admin@administrador.uspg.edu.gt"]
 
 
 def test_audit_migration_adds_table_to_existing_schema(app):

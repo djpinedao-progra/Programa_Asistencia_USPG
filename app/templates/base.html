@@ -30,6 +30,7 @@
       ('Reportes', url_for('main.admin_reports'), 'reports', ep in ['main.admin_reports', 'main.admin_reports_pdf']),
       ('Historial', url_for('main.admin_history'), 'history', ep in ['main.admin_history', 'main.admin_session_report_pdf']),
       ('Auditoría', url_for('main.admin_audit_log'), 'audit', ep == 'main.admin_audit_log'),
+      ('Expo San Pablo', url_for('expo.report'), 'expo', request.blueprint == 'expo'),
     ] %}
   {% elif current_user.role == 'docente' %}
     {% set home = url_for('main.teacher_dashboard') %}

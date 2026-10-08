@@ -13,6 +13,7 @@ from app.models import (
     AuditLog,
     Course,
     CourseEnrollment,
+    PasswordReplacement,
     User,
 )
 from app.repositories import AttendanceRepository, CourseRepository, UserRepository
@@ -34,6 +35,28 @@ class AuditService:
 
 class UserService:
     ALLOWED_ROLES = {"admin", "docente", "alumno"}
+    EMAIL_ROLES = {
+        "administrador.uspg.edu.gt": "admin",
+        "catedratico.uspg.edu.gt": "docente",
+        "alumno.uspg.edu.gt": "alumno",
+    }
+    ROLE_DOMAINS = {role: domain for domain, role in EMAIL_ROLES.items()}
+
+    @classmethod
+    def email_role(cls, email):
+        email = (email or "").strip().lower()
+        if not re.fullmatch(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+", email):
+            return None
+        return cls.EMAIL_ROLES.get(email.split("@")[1])
+
+    @classmethod
+    def validate_email_role(cls, email, role):
+        if cls.email_role(email) != role:
+            domain = cls.ROLE_DOMAINS.get(role)
+            raise ValueError(
+                f"Para este rol usa un correo institucional @{domain}."
+                if domain else "El correo no corresponde al rol seleccionado."
+            )
 
     def __init__(self, users=None):
         self.users = users or UserRepository()
@@ -45,6 +68,7 @@ class UserService:
             raise ValueError("Completa todos los datos y elige una contraseña.")
         if role not in self.ALLOWED_ROLES:
             raise ValueError("El rol seleccionado no es válido.")
+        self.validate_email_role(email, role)
         if role == "alumno" and not re.fullmatch(r"\d{7}", carnet):
             raise ValueError("El carnet debe tener exactamente 7 dígitos, por ejemplo 2600403.")
         if self.users.find_by_email(email):
@@ -98,6 +122,7 @@ class UserService:
             raise ValueError("No se encontró el perfil académico.")
         if not name or "@" not in email:
             raise ValueError("Indica un nombre y correo institucional válidos.")
+        self.validate_email_role(email, user.role)
         existing_email = self.users.find_by_email(email)
         if existing_email and existing_email.id != user.id:
             raise ValueError("Ese correo ya pertenece a otra cuenta.")
@@ -152,6 +177,9 @@ class UserService:
         if new_password != confirmation:
             raise ValueError("La confirmación de contraseña no coincide.")
         user.set_password(new_password)
+        pending = db.session.get(PasswordReplacement, user.id)
+        if pending:
+            db.session.delete(pending)
         AuditService.record(actor_id, action, "user", user.id)
         db.session.commit()
 
@@ -493,12 +521,7 @@ class AttendanceService:
         attendance_session = self.attendance.find_session_by_token_hash(token_hash)
         if not attendance_session or not attendance_session.active:
             raise ValueError("La sesión de asistencia no está activa.")
-        has_enrollments = db.session.scalar(
-            select(CourseEnrollment.id)
-            .where(CourseEnrollment.course_id == attendance_session.course_id)
-            .limit(1)
-        )
-        if has_enrollments and not db.session.scalar(
+        if not db.session.scalar(
             select(CourseEnrollment.id).where(
                 CourseEnrollment.course_id == attendance_session.course_id,
                 CourseEnrollment.student_id == student.id,

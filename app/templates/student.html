@@ -16,7 +16,7 @@
   <div class="student-attendance-layout">
     <div class="attendance-chart-block">
       <div class="attendance-donut attendance-donut-{{ overall_level }}" role="img" aria-label="{{ overall_percentage }} por ciento de asistencia y {{ 100 - overall_percentage }} por ciento de faltas" style="--attendance-rate: {{ overall_percentage }}%"><div><strong>{{ overall_percentage }}%</strong><span>asistencia</span></div></div>
-      <div class="chart-legend"><span><i class="legend-present legend-{{ overall_level }}"></i>Asistencias <strong>{{ total_attended }}</strong></span><span><i class="legend-absence"></i>Faltas <strong>{{ total_absences }}</strong></span></div>
+      <div class="chart-legend"><span><i class="legend-present legend-{{ overall_level }}"></i>Asistencias <strong>{{ total_attended }}</strong></span><span><i class="legend-absence"></i>Faltas <strong>{{ total_absences }}</strong></span>{% if total_justified %}<span><i class="legend-justified"></i>Justificadas <strong>{{ total_justified }}</strong></span>{% endif %}</div>
     </div>
     <div class="attendance-summary">
       {% if overall_percentage < 80 and total_sessions %}
@@ -45,7 +45,7 @@
     <article class="student-course" data-course-progress="{{ course.percentage }}">
       <div class="student-course-top"><div><p class="eyebrow">{{ course.course.code }}</p><h3>{{ course.course.name }}</h3><span>Docente: {{ course.course.teacher.name }}</span></div><strong class="course-rate rate-{{ pct_level(course.percentage) }}">{{ course.percentage }}%</strong></div>
       <div class="course-progress-track" role="img" aria-label="{{ course.percentage }} por ciento de asistencia"><span style="width: {{ course.percentage }}%"></span></div>
-      <div class="course-stats"><span><strong>{{ course.attended_count }}</strong> asistencias</span><span><strong>{{ course.absence_count }}</strong> faltas</span><span>{{ course.total_sessions }} sesiones</span></div>
+      <div class="course-stats"><span><strong>{{ course.attended_count }}</strong> asistencias</span><span><strong>{{ course.absence_count }}</strong> faltas</span><span><strong>{{ course.justified_count }}</strong> justificadas</span><span>{{ course.total_sessions }} sesiones</span></div>
       <details class="course-attendance-detail"><summary>Ver asistencias del curso</summary>
         {% if course.attendance_records %}<ul>{% for attendance in course.attendance_records %}<li><span>{{ attendance.status|capitalize }} · {{ {'qr': 'Código QR', 'manual': 'Docente', 'cierre': 'Cierre'}[attendance.source] }}</span><time datetime="{{ (attendance.recorded_at|localtime).isoformat() }}">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></li>{% endfor %}</ul>{% else %}<p>No hay registros de asistencia.</p>{% endif %}
       </details>

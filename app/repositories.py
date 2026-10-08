@@ -1,18 +1,24 @@
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app import db
 from app.models import Attendance, AttendanceSession, Course, User
 
 
+def _normalized_email_column():
+    return func.lower(func.trim(User.email))
+
+
 class UserRepository:
     def find_by_email(self, email):
-        return db.session.scalar(select(User).where(User.email == email.lower()))
+        return db.session.scalar(
+            select(User).where(_normalized_email_column() == email.strip().lower())
+        )
 
     def find_by_login_identifier(self, identifier):
         normalized = identifier.strip().lower()
         return db.session.scalar(
             select(User).where(
-                or_(User.email == normalized, User.carnet == identifier.strip())
+                or_(_normalized_email_column() == normalized, User.carnet == identifier.strip())
             )
         )
 

@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -16,20 +17,32 @@ login_manager.login_message_category = "warning"
 
 def create_app(test_config=None):
     app = Flask(__name__)
+    app_env = os.getenv("APP_ENV", "development").lower()
+    env_secret = os.getenv("SECRET_KEY")
+    database_url = os.getenv("DATABASE_URL", "sqlite:///asistencia.db")
+    # Hosting providers hand out postgres:// URLs; SQLAlchemy needs the psycopg driver name.
+    for prefix in ("postgres://", "postgresql://"):
+        if database_url.startswith(prefix):
+            database_url = "postgresql+psycopg://" + database_url[len(prefix):]
     app.config.from_mapping(
-        SECRET_KEY=os.getenv("SECRET_KEY", "local-development-key-change-me"),
-        SQLALCHEMY_DATABASE_URI=os.getenv(
-            "DATABASE_URL", "sqlite:///asistencia.db"
-        ),
+        SECRET_KEY=env_secret or secrets.token_urlsafe(48),
+        SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=app_env == "production",
         QR_SESSION_MINUTES=5,
-        APP_BASE_URL=os.getenv("APP_BASE_URL", "").rstrip("/"),
+        APP_BASE_URL=os.getenv("APP_BASE_URL", os.getenv("RENDER_EXTERNAL_URL", "")).rstrip("/"),
         APP_TIMEZONE=os.getenv("APP_TIMEZONE", "America/Guatemala"),
+        APP_ENV=app_env,
     )
     if test_config:
         app.config.update(test_config)
+    if app.config["APP_ENV"] == "production" and not test_config:
+        if not env_secret:
+            raise RuntimeError("SECRET_KEY es obligatoria cuando APP_ENV=production.")
+        if not os.getenv("DATABASE_URL"):
+            raise RuntimeError("DATABASE_URL es obligatoria cuando APP_ENV=production.")
 
     db.init_app(app)
     login_manager.init_app(app)
@@ -45,10 +58,22 @@ def create_app(test_config=None):
     from app.routes import main
 
     app.register_blueprint(main)
+    from app.expo import expo
+
+    app.register_blueprint(expo)
 
     @login_manager.user_loader
     def load_user(user_id):
         return db.session.get(models.User, int(user_id))
+
+    @app.before_request
+    def enforce_account_domain():
+        from flask_login import current_user, logout_user
+        from app.services import UserService
+
+        if current_user.is_authenticated and UserService.email_role(current_user.email) != current_user.role:
+            logout_user()
+            abort(403, description="El correo institucional no corresponde al rol de la cuenta.")
 
     @app.before_request
     def protect_mutations():
@@ -77,6 +102,12 @@ def create_app(test_config=None):
         with app.app_context():
             db.create_all()
         click.echo("Tablas de asistencia creadas.")
+
+    @app.cli.command("migrate-expo")
+    def migrate_expo_command():
+        """Add the public Expo table without changing existing attendance."""
+        models.ExpoAttendance.__table__.create(db.engine, checkfirst=True)
+        click.echo("Registro público de Expo San Pablo listo.")
 
     @app.cli.command("migrate-carnet")
     def migrate_carnet_command():
@@ -109,6 +140,7 @@ def create_app(test_config=None):
                 "status": "VARCHAR(20) NOT NULL DEFAULT 'presente'",
                 "source": "VARCHAR(20) NOT NULL DEFAULT 'qr'",
                 "modified_by_id": "INTEGER",
+                "modified_at": "DATETIME",
             },
         }
         inspector = inspect(db.engine)
@@ -188,6 +220,12 @@ def create_app(test_config=None):
             raise click.ClickException(
                 "Configura ADMIN_EMAIL y una ADMIN_PASSWORD no vacía."
             )
+        from app.services import UserService
+
+        try:
+            UserService.validate_email_role(email, "admin")
+        except ValueError as error:
+            raise click.ClickException(str(error)) from error
         if db.session.scalar(select(User).where(User.email == email)):
             raise click.ClickException("Ya existe una cuenta con ese correo.")
         admin = User(name="Administrador", email=email, role="admin")
