@@ -1,0 +1,42 @@
+# Plans below incur charges; review the current estimate before deployment.
+services:
+  - type: web
+    name: uspg-asistencia-luis
+    runtime: python
+    plan: 0.5c-512mb
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: python prepare_production.py
+    startCommand: gunicorn run:app --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 60
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: uspg-luis-db
+          property: connectionString
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_SSL
+        value: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+databases:
+  - name: uspg-luis-db
+    plan: 0.1c-256mb
+    databaseName: uspg_luis
+    user: uspg
+    ipAllowList: []

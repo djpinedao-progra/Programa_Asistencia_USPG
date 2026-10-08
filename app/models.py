@@ -83,6 +83,7 @@ class Attendance(db.Model):
     )
     student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     recorded_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    modified_at = db.Column(db.DateTime(timezone=True))
     status = db.Column(db.String(20), nullable=False, default="presente")
     source = db.Column(db.String(20), nullable=False, default="qr")
     modified_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
@@ -127,3 +128,25 @@ class AuditLog(db.Model):
         nullable=False,
     )
     actor = db.relationship("User", foreign_keys=[actor_id])
+
+class PasswordReplacement(db.Model):
+    __tablename__ = "password_replacements"
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    requested_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+
+class ExpoAttendance(db.Model):
+    __tablename__ = 'expo_attendance'
+    __table_args__ = (
+        db.CheckConstraint("category IN ('estudiante', 'catedratico', 'publico')", name='ck_expo_category'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(254), nullable=False, unique=True, index=True)
+    category = db.Column(db.String(20), nullable=False, index=True)
+    participation = db.Column(db.String(500), nullable=False)
+    opinion = db.Column(db.Text, nullable=False, default='')
+    recorded_at = db.Column(db.DateTime(timezone=True), nullable=False,
+                            default=lambda: datetime.now(timezone.utc))

@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -16,21 +17,40 @@ login_manager.login_message_category = "warning"
 
 def create_app(test_config=None):
     app = Flask(__name__)
+    app_env = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development")).lower()
+    env_secret = os.getenv("SECRET_KEY")
+    database_url = os.getenv("DATABASE_URL", "sqlite:///luis_independiente.db")
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
     app.config.from_mapping(
-        SECRET_KEY=os.getenv("SECRET_KEY", "local-development-key-change-me"),
-        SQLALCHEMY_DATABASE_URI=os.getenv(
-            "DATABASE_URL", "sqlite:///asistencia.db"
-        ),
+        SECRET_KEY=env_secret or secrets.token_urlsafe(48),
+        SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
-        QR_SESSION_MINUTES=5,
-        APP_BASE_URL=os.getenv("APP_BASE_URL", "").rstrip("/"),
+        SESSION_COOKIE_SECURE=app_env == "production",
+        QR_SESSION_MINUTES=1,
+        APP_BASE_URL=os.getenv("APP_BASE_URL", os.getenv("RENDER_EXTERNAL_URL", "")).rstrip("/"),
         APP_TIMEZONE=os.getenv("APP_TIMEZONE", "America/Guatemala"),
+        APP_ENV=app_env,
     )
     if test_config:
         app.config.update(test_config)
+    if app.config.get("APP_ENV") == "production":
+        app.config["SESSION_COOKIE_SECURE"] = True
+    if (
+        app.config.get("APP_ENV") == "production"
+        and not env_secret
+        and not (test_config and test_config.get("SECRET_KEY"))
+    ):
+        raise RuntimeError(
+            "SECRET_KEY es obligatoria cuando APP_ENV=production."
+        )
 
+    if app.config.get("APP_ENV") == "production" and not os.getenv("DATABASE_URL") and not test_config:
+        raise RuntimeError("DATABASE_URL es obligatoria en producción.")
     db.init_app(app)
     login_manager.init_app(app)
 
@@ -45,10 +65,20 @@ def create_app(test_config=None):
     from app.routes import main
 
     app.register_blueprint(main)
+    from app.expo import expo
+    app.register_blueprint(expo)
 
     @login_manager.user_loader
     def load_user(user_id):
         return db.session.get(models.User, int(user_id))
+
+    @app.before_request
+    def enforce_account_domain():
+        from flask_login import current_user, logout_user
+        from app.services import UserService
+        if current_user.is_authenticated and UserService.email_role(current_user.email) != current_user.role:
+            logout_user()
+            abort(403, description="El correo institucional no corresponde al rol de la cuenta.")
 
     @app.before_request
     def protect_mutations():
@@ -77,6 +107,12 @@ def create_app(test_config=None):
         with app.app_context():
             db.create_all()
         click.echo("Tablas de asistencia creadas.")
+
+    @app.cli.command("migrate-expo")
+    def migrate_expo_command():
+        """Add the public Expo table without changing existing attendance."""
+        models.ExpoAttendance.__table__.create(db.engine, checkfirst=True)
+        click.echo("Registro público de Expo San Pablo listo.")
 
     @app.cli.command("migrate-carnet")
     def migrate_carnet_command():
@@ -109,6 +145,7 @@ def create_app(test_config=None):
                 "status": "VARCHAR(20) NOT NULL DEFAULT 'presente'",
                 "source": "VARCHAR(20) NOT NULL DEFAULT 'qr'",
                 "modified_by_id": "INTEGER",
+                "modified_at": "DATETIME",
             },
         }
         inspector = inspect(db.engine)
@@ -186,8 +223,14 @@ def create_app(test_config=None):
         password = os.getenv("ADMIN_PASSWORD", "")
         if not email or not password:
             raise click.ClickException(
-                "Configura ADMIN_EMAIL y una ADMIN_PASSWORD no vacía."
+                "Configura ADMIN_EMAIL y ADMIN_PASSWORD."
             )
+        try:
+            from app.services import UserService
+            UserService.validate_email_role(email, "admin")
+            UserService.validate_password(password)
+        except ValueError as error:
+            raise click.ClickException(str(error)) from error
         if db.session.scalar(select(User).where(User.email == email)):
             raise click.ClickException("Ya existe una cuenta con ese correo.")
         admin = User(name="Administrador", email=email, role="admin")
@@ -195,20 +238,5 @@ def create_app(test_config=None):
         db.session.add(admin)
         db.session.commit()
         click.echo(f"Administrador creado: {email}")
-
-    @app.cli.command("seed-test-users")
-    def seed_test_users_command():
-        """Create or reset the shared test accounts, courses and attendance used by the team."""
-        from app.test_data import TEST_PASSWORD, seed_test_data
-
-        try:
-            messages = seed_test_data()
-        except ValueError as error:
-            raise click.ClickException(str(error)) from error
-        for message in messages:
-            click.echo(message)
-        click.echo(
-            f"Contraseña de las cuentas de prueba: {TEST_PASSWORD}. Úsalas solo en desarrollo."
-        )
 
     return app

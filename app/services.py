@@ -34,6 +34,27 @@ class AuditService:
 
 class UserService:
     ALLOWED_ROLES = {"admin", "docente", "alumno"}
+    EMAIL_ROLES = {"alumno.uspg.edu.gt": "alumno", "catedratico.uspg.edu.gt": "docente", "administrador.uspg.edu.gt": "admin"}
+    MIN_PASSWORD_LENGTH = 8
+
+    @classmethod
+    def email_role(cls, email):
+        email = email.strip().lower()
+        if not re.fullmatch(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+", email):
+            return None
+        return cls.EMAIL_ROLES.get(email.split("@")[1])
+
+    @classmethod
+    def validate_email_role(cls, email, role):
+        if cls.email_role(email) != role:
+            raise ValueError("El dominio del correo universitario no corresponde al rol seleccionado.")
+
+    @classmethod
+    def validate_password(cls, password):
+        if not password or len(password) < cls.MIN_PASSWORD_LENGTH:
+            raise ValueError(
+                f"La contraseña debe tener al menos {cls.MIN_PASSWORD_LENGTH} caracteres."
+            )
 
     def __init__(self, users=None):
         self.users = users or UserRepository()
@@ -41,8 +62,10 @@ class UserService:
     def create_user(self, name, email, password, role, carnet="", actor_id=None):
         name, email = name.strip(), email.strip().lower()
         carnet = carnet.strip()
-        if not name or "@" not in email or not password:
-            raise ValueError("Completa todos los datos y elige una contraseña.")
+        if not name or "@" not in email:
+            raise ValueError("Completa todos los datos obligatorios.")
+        self.validate_email_role(email, role)
+        self.validate_password(password)
         if role not in self.ALLOWED_ROLES:
             raise ValueError("El rol seleccionado no es válido.")
         if role == "alumno" and not re.fullmatch(r"\d{7}", carnet):
@@ -98,6 +121,7 @@ class UserService:
             raise ValueError("No se encontró el perfil académico.")
         if not name or "@" not in email:
             raise ValueError("Indica un nombre y correo institucional válidos.")
+        self.validate_email_role(email, user.role)
         existing_email = self.users.find_by_email(email)
         if existing_email and existing_email.id != user.id:
             raise ValueError("Ese correo ya pertenece a otra cuenta.")
@@ -145,13 +169,16 @@ class UserService:
             user, new_password, confirmation, actor_id, "password_reset"
         )
 
-    @staticmethod
-    def _save_new_password(user, new_password, confirmation, actor_id, action):
-        if not new_password:
-            raise ValueError("La nueva contraseña no puede estar vacía.")
+    @classmethod
+    def _save_new_password(cls, user, new_password, confirmation, actor_id, action):
+        cls.validate_password(new_password)
         if new_password != confirmation:
             raise ValueError("La confirmación de contraseña no coincide.")
         user.set_password(new_password)
+        from app.models import PasswordReplacement
+        pending = db.session.get(PasswordReplacement, user.id)
+        if pending:
+            db.session.delete(pending)
         AuditService.record(actor_id, action, "user", user.id)
         db.session.commit()
 
@@ -463,10 +490,10 @@ class CourseService:
 
 
 class AttendanceService:
-    def __init__(self, attendance=None, courses=None, session_minutes=15):
+    def __init__(self, attendance=None, courses=None, session_minutes=1):
         self.attendance = attendance or AttendanceRepository()
         self.courses = courses or CourseRepository()
-        self.session_minutes = session_minutes
+        self.session_minutes = min(session_minutes, 1)
 
     def create_session(self, course_id, teacher_id):
         course = self.courses.get_for_teacher(course_id, teacher_id)
@@ -493,12 +520,7 @@ class AttendanceService:
         attendance_session = self.attendance.find_session_by_token_hash(token_hash)
         if not attendance_session or not attendance_session.active:
             raise ValueError("La sesión de asistencia no está activa.")
-        has_enrollments = db.session.scalar(
-            select(CourseEnrollment.id)
-            .where(CourseEnrollment.course_id == attendance_session.course_id)
-            .limit(1)
-        )
-        if has_enrollments and not db.session.scalar(
+        if not db.session.scalar(
             select(CourseEnrollment.id).where(
                 CourseEnrollment.course_id == attendance_session.course_id,
                 CourseEnrollment.student_id == student.id,
