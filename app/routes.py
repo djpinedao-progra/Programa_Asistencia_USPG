@@ -42,16 +42,11 @@ from app.models import (
     User,
 )
 from app.repositories import AttendanceRepository, CourseRepository, UserRepository
+from app.security import csrf_token
 from app.services import AttendanceService, AuditService, CourseService, UserService
 from app.time_utils import local_date_utc_bounds, local_datetime, utc_isoformat
 
 main = Blueprint("main", __name__)
-
-
-def csrf_token():
-    if "csrf_token" not in session:
-        session["csrf_token"] = secrets.token_urlsafe(32)
-    return session["csrf_token"]
 
 
 def roles_required(*roles):
