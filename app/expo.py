@@ -3,10 +3,8 @@ import io
 from xml.sax.saxutils import escape
 
 import qrcode
-from email_validator import validate_email, EmailNotValidError
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, current_app, abort
 from sqlalchemy import select, func
-from sqlalchemy.exc import IntegrityError
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from reportlab.lib import colors
@@ -17,6 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from app import db
 from app.models import ExpoAttendance
 from app.routes import roles_required
+from app.services.expo_service import ExpoService
 from app.time_utils import local_datetime
 
 expo = Blueprint('expo', __name__)
@@ -28,38 +27,17 @@ def registration():
     values = request.form if request.method == 'POST' else {}
     if request.method == 'POST':
         try:
-            name = request.form.get('name', '').strip()
-            if not 2 <= len(name) <= 120:
-                raise ValueError('Escribe tu nombre completo (entre 2 y 120 caracteres).')
-            try:
-                email = validate_email(request.form.get('email', '').strip(), check_deliverability=False).normalized.casefold()
-            except EmailNotValidError:
-                raise ValueError('Escribe un correo electrónico válido, personal o institucional.')
-            if len(email) > 254:
-                raise ValueError('El correo es demasiado largo.')
-            category = request.form.get('category', '')
-            if category not in CATEGORIES:
-                raise ValueError('Selecciona estudiante, catedrático o público general.')
-            participation = request.form.get('participation', '').strip()
-            opinion = request.form.get('opinion', '').strip()
-            if not 1 <= len(participation) <= 500:
-                raise ValueError('Describe tu participación (máximo 500 caracteres).')
-            if len(opinion) > 2000:
-                raise ValueError('Tu opinión debe tener como máximo 2000 caracteres.')
-            if request.form.get('consent') != 'yes':
-                raise ValueError('Autoriza el registro de tus datos para este evento.')
-            if db.session.scalar(select(ExpoAttendance.id).where(func.lower(func.trim(ExpoAttendance.email)) == email)):
+            registered = ExpoService().register(
+                request.form.get('name', ''),
+                request.form.get('email', ''),
+                request.form.get('category', ''),
+                request.form.get('participation', ''),
+                request.form.get('opinion', ''),
+                request.form.get('consent', ''),
+            )
+            if not registered:
                 flash('Este correo ya tiene asistencia registrada. No se sumó un registro nuevo.', 'warning')
                 return redirect(url_for('expo.registration'))
-            db.session.add(ExpoAttendance(name=name, email=email, category=category,
-                                          participation=participation, opinion=opinion))
-            try:
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
-                flash('Este correo ya tiene asistencia registrada. No se sumó un registro nuevo.', 'warning')
-                return redirect(url_for('expo.registration'))
-            # No account is created, and no submitted data is exposed in the URL.
             flash('¡Gracias! Tu asistencia y participación quedaron registradas.', 'success')
             return redirect(url_for('expo.registration', registrado='1'))
         except ValueError as error:
