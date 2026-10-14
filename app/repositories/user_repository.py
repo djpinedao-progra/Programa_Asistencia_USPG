@@ -37,6 +37,11 @@ class UserRepository:
         db.session.commit()
         return user
 
+    def add_many(self, users):
+        db.session.add_all(users)
+        db.session.commit()
+        return users
+
     def save(self, user):
         db.session.add(user)
         db.session.commit()

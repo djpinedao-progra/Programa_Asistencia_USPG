@@ -1,7 +1,8 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Attendance, AttendanceSession
+from app.models import Attendance, AttendanceSession, CourseEnrollment
 
 
 class AttendanceRepository:
@@ -22,8 +23,20 @@ class AttendanceRepository:
 
     def record(self, attendance):
         db.session.add(attendance)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise
         return attendance
+
+    def is_student_enrolled(self, course_id, student_id):
+        return db.session.scalar(
+            select(CourseEnrollment.id).where(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.student_id == student_id,
+            )
+        ) is not None
 
     def list_for_student(self, student_id):
         return db.session.scalars(

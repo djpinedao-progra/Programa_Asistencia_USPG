@@ -2,11 +2,9 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.extensions import db
-from app.models import Attendance, AttendanceSession, CourseEnrollment
+from app.models import Attendance, AttendanceSession
 from app.repositories import AttendanceRepository, CourseRepository
 
 
@@ -41,11 +39,8 @@ class AttendanceService:
         attendance_session = self.attendance.find_session_by_token_hash(token_hash)
         if not attendance_session or not attendance_session.active:
             raise ValueError("La sesión de asistencia no está activa.")
-        if not db.session.scalar(
-            select(CourseEnrollment.id).where(
-                CourseEnrollment.course_id == attendance_session.course_id,
-                CourseEnrollment.student_id == student.id,
-            )
+        if not self.attendance.is_student_enrolled(
+            attendance_session.course_id, student.id
         ):
             raise ValueError("No estás asignado a este curso.")
         expiration = attendance_session.expires_at
@@ -61,6 +56,5 @@ class AttendanceService:
         try:
             self.attendance.record(attendance)
         except IntegrityError as error:
-            db.session.rollback()
             raise ValueError("Tu asistencia ya quedó registrada.") from error
         return attendance

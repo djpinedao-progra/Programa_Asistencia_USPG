@@ -18,6 +18,9 @@ class CourseRepository:
     def get_by_id(self, course_id):
         return db.session.get(Course, course_id)
 
+    def find_by_code(self, code):
+        return db.session.scalar(select(Course).where(Course.code == code))
+
     def get_for_teacher(self, course_id, teacher_id):
         return db.session.scalar(
             select(Course).where(
