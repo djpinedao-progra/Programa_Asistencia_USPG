@@ -19,7 +19,9 @@ def create_app(test_config=None):
     )
 
     from app import models
-    from app.routes import main
+    from app.controllers import main, register_controllers
+
+    register_controllers()
     from app.expo import expo
 
     app.register_blueprint(main)

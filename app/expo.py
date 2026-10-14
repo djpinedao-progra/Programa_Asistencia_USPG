@@ -3,7 +3,7 @@ import io
 from xml.sax.saxutils import escape
 
 import qrcode
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, current_app, abort
+from flask import render_template, request, redirect, url_for, flash, send_file, current_app, abort
 from sqlalchemy import select, func
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -14,11 +14,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 from app import db
 from app.models import ExpoAttendance
-from app.routes import roles_required
+from app.controllers import expo
+from app.controllers.decorators import roles_required
 from app.services.expo_service import ExpoService
 from app.time_utils import local_datetime
 
-expo = Blueprint('expo', __name__)
 CATEGORIES = {'estudiante': 'Estudiante', 'catedratico': 'Catedrático', 'publico': 'Público general'}
 
 
