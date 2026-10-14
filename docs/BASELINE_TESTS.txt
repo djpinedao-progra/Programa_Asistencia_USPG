@@ -1,0 +1,7 @@
+Línea base previa al refactor (ejecutada desde `main` antes de crear `refactor/mvc`).
+Se conservaron los cambios preexistentes del árbol de trabajo; la prueba incluyó
+`tests/test_users.py`, que ya era un archivo no versionado.
+
+$ venv\Scripts\python.exe -m pytest -q
+........................                                                 [100%]
+24 passed in 9.52s
