@@ -6,15 +6,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
-import qrcode
 from sqlalchemy import func, or_, select
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import mm
-from reportlab.graphics.shapes import Drawing, Rect, String
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from xml.sax.saxutils import escape
 from flask import (
     Blueprint,
     abort,

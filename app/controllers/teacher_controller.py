@@ -19,7 +19,7 @@ def teacher_dashboard():
             .limit(8)
         ).all()
     return render_template(
-        "teacher.html",
+        "teacher/teacher.html",
         courses=course_models,
         course_metrics=course_metrics,
         notice_history=notices,
@@ -45,7 +45,7 @@ def teacher_course(course_id):
     if sort_by not in sort_keys:
         sort_by = "nombre"
     metrics["students"].sort(key=sort_keys[sort_by])
-    return render_template("teacher_course.html", **metrics, sort_by=sort_by)
+    return render_template("teacher/teacher_course.html", **metrics, sort_by=sort_by)
 
 
 @main.get("/docente/estudiantes")
@@ -68,7 +68,7 @@ def teacher_students():
         key=lambda row: (row["student"].name.casefold(), row["course"].name.casefold())
     )
     return render_template(
-        "teacher_students.html",
+        "teacher/teacher_students.html",
         courses=courses,
         selected_course=selected_course,
         students=students,
@@ -123,7 +123,7 @@ def teacher_history():
         .offset((page - 1) * 25).limit(25)
     ).all() if conditions else []
     return render_template(
-        "teacher_history.html", courses=courses, records=records, filters=filters,
+        "teacher/teacher_history.html", courses=courses, records=records, filters=filters,
         page=page, pages=pages, total=total,
     )
 

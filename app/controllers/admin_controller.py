@@ -26,7 +26,7 @@ def admin_dashboard():
     student_summaries = _admin_student_summaries()
     session_summaries = _admin_session_summaries()[:6]
     return render_template(
-        "admin.html",
+        "admin/admin.html",
         users=users,
         courses=courses,
         teachers=[user for user in users if user.role == "docente"],
@@ -110,7 +110,7 @@ def admin_students():
             or query in (row["student"].carnet or "").casefold()
         ]
     return render_template(
-        "admin_students.html", students=students, courses=courses,
+        "admin/admin_students.html", students=students, courses=courses,
         query=query, selected_course=course_id,
     )
 
@@ -127,7 +127,7 @@ def admin_teachers():
             teacher for teacher in teachers
             if query in teacher.name.casefold() or query in teacher.email.casefold()
         ]
-    return render_template("admin_teachers.html", teachers=teachers, query=query)
+    return render_template("admin/admin_teachers.html", teachers=teachers, query=query)
 
 
 @main.route("/admin/usuarios/<int:user_id>/perfil", methods=["GET", "POST"])
@@ -154,7 +154,7 @@ def admin_user_profile(user_id):
         else [enrollment.course for enrollment in user.course_enrollments]
     )
     return render_template(
-        "admin_profile.html", user=user, profile_courses=profile_courses
+        "admin/admin_profile.html", user=user, profile_courses=profile_courses
     )
 
 
@@ -216,7 +216,7 @@ def admin_courses():
         select(User).where(User.role == "alumno").order_by(User.name)
     ).all()
     return render_template(
-        "admin_courses.html", courses=courses, teachers=teachers,
+        "admin/admin_courses.html", courses=courses, teachers=teachers,
         students=students, query=query, selected_teacher=teacher_id,
     )
 
@@ -245,7 +245,7 @@ def admin_attendance_overview():
     if risk_filter in {"alto", "medio", "ninguno"}:
         students = [row for row in students if row["risk"] == risk_filter]
     return render_template(
-        "admin_attendance.html", students=students, courses=courses,
+        "admin/admin_attendance.html", students=students, courses=courses,
         selected_course=course_id, session_date=session_date,
         query=query, risk_filter=risk_filter,
     )
@@ -272,7 +272,7 @@ def admin_history():
             course_id, teacher_id, session_date or None, page=page
         )
     return render_template(
-        "admin_history.html", sessions=sessions, courses=courses,
+        "admin/admin_history.html", sessions=sessions, courses=courses,
         teachers=teachers, selected_course=course_id,
         selected_teacher=teacher_id, session_date=session_date,
         page=page, pages=pages, total=total,
@@ -292,5 +292,5 @@ def admin_audit_log():
         .limit(50)
     ).all()
     return render_template(
-        "admin_audit.html", entries=entries, page=page, pages=pages, total=total
+        "admin/admin_audit.html", entries=entries, page=page, pages=pages, total=total
     )

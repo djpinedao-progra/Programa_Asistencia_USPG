@@ -10,13 +10,13 @@ def student_dashboard():
     data = student_dashboard_data(
         current_user.id, request.args.get("page", 1, type=int)
     )
-    return render_template("student.html", **data)
+    return render_template("student/student.html", **data)
 
 
 @main.get("/check-in")
 @roles_required("alumno")
 def checkin():
-    return render_template("checkin.html", qr_token=request.args.get("token", ""))
+    return render_template("student/checkin.html", qr_token=request.args.get("token", ""))
 
 
 @main.post("/api/asistencia")

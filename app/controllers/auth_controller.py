@@ -19,7 +19,7 @@ def login():
                 return redirect(next_url)
             return redirect(url_for("main.dashboard"))
         flash("Correo o contraseña incorrectos.", "error")
-    return render_template("login.html")
+    return render_template("auth/login.html")
 
 
 @main.route("/registro", methods=["GET", "POST"])
@@ -38,7 +38,7 @@ def student_registration():
             return redirect(url_for("main.login"))
         except ValueError as error:
             flash(str(error), "error")
-    return render_template("register.html")
+    return render_template("auth/register.html")
 
 
 @main.post("/salir")
@@ -74,7 +74,7 @@ def account_security():
             return redirect(url_for("main.account_security"))
         except ValueError as error:
             flash(str(error), "error")
-    return render_template("account_security.html")
+    return render_template("auth/account_security.html")
 
 
 @main.route("/recuperar-contrasena", methods=["GET", "POST"])
@@ -88,4 +88,4 @@ def recover_password():
             request_replacement(email)
             flash("Si el correo pertenece a una cuenta válida, recibirás una contraseña temporal. Revisa también correo no deseado.", "success")
             return redirect(url_for("main.login"))
-    return render_template("recover_password.html")
+    return render_template("auth/recover_password.html")

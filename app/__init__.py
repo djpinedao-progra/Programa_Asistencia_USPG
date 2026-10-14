@@ -4,7 +4,11 @@ from app.extensions import db, login_manager
 
 
 def create_app(test_config=None):
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        template_folder="views/templates",
+        static_folder="views/static",
+    )
     from app.config import load_config
 
     app.config.from_mapping(load_config(test_config))
@@ -19,10 +23,9 @@ def create_app(test_config=None):
     )
 
     from app import models
-    from app.controllers import main, register_controllers
+    from app.controllers import expo, main, register_controllers
 
     register_controllers()
-    from app.expo import expo
 
     app.register_blueprint(main)
     app.register_blueprint(expo)

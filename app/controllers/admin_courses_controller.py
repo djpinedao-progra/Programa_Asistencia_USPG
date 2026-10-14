@@ -8,7 +8,7 @@ from app.controllers._support import _csv_safe, _preview_enrollment_rows
 @roles_required("admin")
 def admin_import_course_enrollments():
     if request.method == "GET":
-        return render_template("admin_course_import.html")
+        return render_template("admin/admin_course_import.html")
 
     if request.form.get("action") in {"import", "download-errors"}:
         course_codes = request.form.getlist("course_code")
@@ -48,13 +48,13 @@ def admin_import_course_enrollments():
         except ValueError as error:
             flash(str(error), "error")
             return render_template(
-                "admin_course_import.html", rows=rows, preview=False, imported=0
+                "admin/admin_course_import.html", rows=rows, preview=False, imported=0
             )
         for row in rows:
             if row["valid"]:
                 row["status"] = "Matriculado"
         return render_template(
-            "admin_course_import.html", rows=rows, preview=False, imported=added
+            "admin/admin_course_import.html", rows=rows, preview=False, imported=added
         )
 
     uploaded_file = request.files.get("file")
@@ -87,7 +87,7 @@ def admin_import_course_enrollments():
         return redirect(url_for("main.admin_import_course_enrollments"))
     rows = _preview_enrollment_rows(input_rows)
     return render_template(
-        "admin_course_import.html", rows=rows, preview=True, imported=0
+        "admin/admin_course_import.html", rows=rows, preview=True, imported=0
     )
 
 

@@ -2,6 +2,7 @@ from app.controllers import main
 from app.controllers.decorators import roles_required
 from app.controllers._support import *
 from app.controllers._support import _course_roster
+from app.views.reports.qr_builder import build_qr_png
 
 
 def _owned_attendance_session(session_id):
@@ -137,10 +138,7 @@ def teacher_session(session_id):
             current_app.config["APP_BASE_URL"] or request.host_url,
             url_for("main.checkin", token=raw_token),
         )
-        image = qrcode.make(destination)
-        output = io.BytesIO()
-        image.save(output, format="PNG")
-        qr_data = base64.b64encode(output.getvalue()).decode("ascii")
+        qr_data = base64.b64encode(build_qr_png(destination)).decode("ascii")
     attendances = db.session.scalars(
         select(Attendance).where(Attendance.session_id == session_id)
     ).all()
@@ -148,7 +146,7 @@ def teacher_session(session_id):
         attendance.student_id: attendance for attendance in attendances
     }
     return render_template(
-        "session.html",
+        "teacher/session.html",
         attendance_session=attendance_session,
         qr_data=qr_data,
         attendances=attendances,
