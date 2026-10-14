@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
-from app.extensions import db
+from app.repositories import BackupRepository
 
 
 BACKUP_FORMAT = "uspg-attendance-backup"
@@ -41,26 +41,18 @@ def _json_object_hook(value):
 
 
 def create_backup(destination):
+    repository = BackupRepository()
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    tables = db.metadata.sorted_tables
+    source_dialect, tables = repository.read_database()
     payload = {
         "format": BACKUP_FORMAT,
         "version": BACKUP_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "source_dialect": db.engine.dialect.name,
-        "tables": {},
+        "source_dialect": source_dialect,
+        "tables": tables,
     }
-    row_count = 0
-    with db.engine.connect() as connection:
-        with connection.begin():
-            for table in tables:
-                rows = [dict(row) for row in connection.execute(table.select()).mappings()]
-                payload["tables"][table.name] = {
-                    "columns": [column.name for column in table.columns],
-                    "rows": rows,
-                }
-                row_count += len(rows)
+    row_count = sum(len(table_data["rows"]) for table_data in tables.values())
 
     temp_name = None
     try:
@@ -80,6 +72,7 @@ def create_backup(destination):
 
 
 def restore_backup(source):
+    repository = BackupRepository()
     source = Path(source)
     try:
         with gzip.open(source, "rt", encoding="utf-8") as archive:
@@ -92,16 +85,15 @@ def restore_backup(source):
     if payload.get("format") != BACKUP_FORMAT or payload.get("version") != BACKUP_VERSION:
         raise ValueError("El formato o la versión del respaldo no son compatibles.")
     archived_tables = payload.get("tables")
-    expected_tables = {table.name: table for table in db.metadata.sorted_tables}
+    expected_tables = repository.table_columns()
     if not isinstance(archived_tables, dict) or set(archived_tables) != set(expected_tables):
         raise ValueError("El esquema del respaldo no coincide con esta versión del programa.")
 
     row_count = 0
-    for table_name, table in expected_tables.items():
+    for table_name, columns in expected_tables.items():
         table_data = archived_tables[table_name]
         if not isinstance(table_data, dict):
             raise ValueError(f"La definición de la tabla {table_name} no coincide.")
-        columns = [column.name for column in table.columns]
         if table_data.get("columns") != columns or not isinstance(table_data.get("rows"), list):
             raise ValueError(f"La definición de la tabla {table_name} no coincide.")
         for row in table_data["rows"]:
@@ -109,12 +101,5 @@ def restore_backup(source):
                 raise ValueError(f"Hay una fila incompatible en la tabla {table_name}.")
         row_count += len(table_data["rows"])
 
-    tables = list(db.metadata.sorted_tables)
-    with db.engine.begin() as connection:
-        for table in reversed(tables):
-            connection.execute(table.delete())
-        for table in tables:
-            rows = archived_tables[table.name]["rows"]
-            for offset in range(0, len(rows), 500):
-                connection.execute(table.insert(), rows[offset : offset + 500])
-    return len(tables), row_count
+    repository.replace_database(archived_tables)
+    return len(expected_tables), row_count

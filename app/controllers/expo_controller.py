@@ -2,10 +2,7 @@
 import io
 
 from flask import render_template, request, redirect, url_for, flash, send_file, current_app, abort
-from sqlalchemy import select, func
 
-from app import db
-from app.models import ExpoAttendance
 from app.controllers import expo
 from app.controllers.decorators import roles_required
 from app.services.expo_service import ExpoService
@@ -51,18 +48,14 @@ def report_data():
     category = request.args.get('categoria', '')
     if category and category not in CATEGORIES:
         abort(400, description='Categoría inválida.')
-    counts = dict(db.session.execute(select(ExpoAttendance.category, func.count()).group_by(ExpoAttendance.category)).all())
-    query = select(ExpoAttendance).order_by(ExpoAttendance.recorded_at.desc(), ExpoAttendance.id.desc())
-    if category:
-        query = query.where(ExpoAttendance.category == category)
-    return category, counts, query
+    return category, ExpoService().count_by_category()
 
 
 @expo.get('/admin/expo-san-pablo')
 @roles_required('admin')
 def report():
-    category, counts, query = report_data()
-    page = db.paginate(query, per_page=25, max_per_page=25)
+    category, counts = report_data()
+    page = ExpoService().paginate(category, per_page=25)
     return render_template('expo/expo_report.html', categories=CATEGORIES, category=category,
                            counts=counts, total=sum(counts.values()), page=page, public_url=public_url())
 
@@ -82,7 +75,7 @@ def date_label(row):
 @expo.get('/admin/expo-san-pablo/reporte.xlsx')
 @roles_required('admin')
 def excel_report():
-    category, counts, query = report_data()
+    category, counts = report_data()
     attendees = [
         {
             'name': row.name,
@@ -92,7 +85,7 @@ def excel_report():
             'opinion': row.opinion,
             'recorded_at': date_label(row),
         }
-        for row in db.session.scalars(query)
+        for row in ExpoService().list_filtered(category)
     ]
     output = io.BytesIO(build_expo_workbook(category, CATEGORIES, counts, attendees))
     return send_file(output, as_attachment=True, download_name='Asistencia-Expo-San-Pablo.xlsx',
@@ -102,7 +95,7 @@ def excel_report():
 @expo.get('/admin/expo-san-pablo/reporte.pdf')
 @roles_required('admin')
 def pdf_report():
-    category, counts, query = report_data()
+    category, counts = report_data()
     attendees = [
         {
             'name': row.name,
@@ -112,7 +105,7 @@ def pdf_report():
             'opinion': row.opinion,
             'recorded_at': date_label(row),
         }
-        for row in db.session.scalars(query)
+        for row in ExpoService().list_filtered(category)
     ]
     output = io.BytesIO(
         build_expo_report_pdf(category, CATEGORIES, counts, attendees)

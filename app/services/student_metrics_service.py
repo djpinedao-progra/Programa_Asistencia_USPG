@@ -1,31 +1,22 @@
-from sqlalchemy import or_, select
-
-from app.extensions import db
-from app.models import AttendanceSession, Course, CourseEnrollment, Notice
-from app.repositories import AttendanceRepository
+from app.models import AttendanceSession, Course, Notice
+from app.repositories import (
+    AttendanceRepository,
+    CourseEnrollmentRepository,
+    NoticeRepository,
+)
 
 
 def student_dashboard_data(student_id, page_number=1):
-    attendances = AttendanceRepository().list_for_student(student_id)
+    attendance_repository = AttendanceRepository()
+    enrollment_repository = CourseEnrollmentRepository()
+    attendances = attendance_repository.list_for_student(student_id)
     history_total = len(attendances)
     history_pages = max(1, (history_total + 24) // 25)
     history_page = min(max(1, page_number), history_pages)
     history_attendances = attendances[(history_page - 1) * 25 : history_page * 25]
     course_ids = {attendance.session.course_id for attendance in attendances}
-    course_ids.update(
-        db.session.scalars(
-            select(CourseEnrollment.course_id).where(
-                CourseEnrollment.student_id == student_id
-            )
-        ).all()
-    )
-    sessions = []
-    if course_ids:
-        sessions = db.session.scalars(
-            select(AttendanceSession)
-            .where(AttendanceSession.course_id.in_(course_ids))
-            .order_by(AttendanceSession.created_at.desc())
-        ).all()
+    course_ids.update(enrollment_repository.list_course_ids_for_student(student_id))
+    sessions = attendance_repository.list_sessions_for_courses(course_ids)
     attendance_by_session = {
         attendance.session_id: attendance for attendance in attendances
     }
@@ -35,11 +26,7 @@ def student_dashboard_data(student_id, page_number=1):
         if attendance_session.closed_at is not None
         or attendance_session.id in attendance_by_session
     ]
-    student_courses = (
-        db.session.scalars(select(Course).where(Course.id.in_(course_ids))).all()
-        if course_ids
-        else []
-    )
+    student_courses = enrollment_repository.list_courses(course_ids)
     course_progress = {
         course.id: {
             "course": course,
@@ -82,20 +69,9 @@ def student_dashboard_data(student_id, page_number=1):
     total_attended = sum(course["attended_count"] for course in courses)
     overall_percentage = round(total_attended / total_sessions * 100) if total_sessions else 0
     notices = [course for course in courses if course["percentage"] < 90]
-    received_notices = []
-    if course_ids:
-        received_notices = db.session.scalars(
-            select(Notice)
-            .where(
-                Notice.course_id.in_(course_ids),
-                or_(
-                    Notice.student_id == student_id,
-                    Notice.student_id.is_(None),
-                ),
-            )
-            .order_by(Notice.created_at.desc())
-            .limit(20)
-        ).all()
+    received_notices = NoticeRepository().list_for_student_courses(
+        course_ids, student_id, limit=20
+    )
     return {
         "attendances": attendances,
         "history_attendances": history_attendances,

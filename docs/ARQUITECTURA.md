@@ -10,7 +10,7 @@ configuración de entorno en `app/config.py`.
 app/
 ├── __init__.py, config.py, extensions.py, security.py, cli.py
 ├── models/          # Tablas SQLAlchemy, relaciones y métodos del registro
-├── repositories/    # Consultas y persistencia por entidad
+├── repositories/    # Consultas y persistencia por entidad y reportes agregados
 ├── services/        # Reglas, validaciones, métricas y preparación de datos
 ├── controllers/     # Blueprints y rutas HTTP agrupadas por área
 ├── views/
@@ -28,10 +28,11 @@ reglas sin depender de Flask; los repositorios encapsulan SQLAlchemy. Los
 generadores de `views/reports/` reciben estructuras de datos y devuelven bytes.
 Las plantillas reciben datos preparados y no consultan la base de datos.
 
-Hay consultas directas en algunos controladores y servicios heredados que aún
-deben pasar a repositorios; están detalladas en [PENDIENTES.md](PENDIENTES.md).
-Por eso, la regla anterior describe el destino de la migración, no una garantía
-de que cada módulo ya la cumpla.
+El código de controladores y servicios no consulta directamente la sesión de
+SQLAlchemy. Las consultas de métricas que combinan asistencia y matrícula están
+en `AttendanceMetricsRepository`; el respaldo usa `BackupRepository`. Algunos
+handlers aún requieren reducir su preparación de datos, como se detalla en
+[PENDIENTES.md](PENDIENTES.md).
 
 ## Recorrido de una petición
 

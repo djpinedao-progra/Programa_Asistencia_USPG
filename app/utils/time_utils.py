@@ -27,3 +27,12 @@ def local_date_utc_bounds(value, timezone_name="America/Guatemala"):
         start.astimezone(timezone.utc).replace(tzinfo=None),
         end.astimezone(timezone.utc).replace(tzinfo=None),
     )
+
+
+def local_date_bounds_or_none(value, timezone_name="America/Guatemala"):
+    if not value:
+        return None
+    try:
+        return local_date_utc_bounds(value, timezone_name)
+    except ValueError:
+        return None

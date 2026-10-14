@@ -7,8 +7,8 @@ from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
 from werkzeug.security import check_password_hash, generate_password_hash
-from app.extensions import db
 from app.models import PasswordReplacement, User
+from app.repositories import UserRepository
 from app.services import AuditService, UserService
 
 
@@ -49,43 +49,45 @@ def send_password(email, password):
 
 
 def request_replacement(email, logger):
-    user = db.session.scalar(db.select(User).where(User.email == email))
+    users = UserRepository()
+    user = users.find_by_exact_email(email)
     if not user or UserService.email_role(email) != user.role:
         return
     now = datetime.now(timezone.utc)
-    pending = db.session.get(PasswordReplacement, user.id)
+    pending = users.find_password_replacement(user.id)
     # Persistent per-account throttle; repeated requests cannot flood the mailbox.
     if pending and now < utc(pending.requested_at) + timedelta(minutes=2):
         return
     password = secrets.token_urlsafe(18)
     if not pending:
         pending = PasswordReplacement(user_id=user.id)
-        db.session.add(pending)
+        users.stage_password_replacement(pending)
     pending.password_hash = generate_password_hash(password)
     pending.requested_at = now
     pending.expires_at = now + timedelta(minutes=15)
     try:
-        db.session.flush()
+        users.flush()
         send_password(email, password)
         AuditService.record(user.id, "password_replacement_requested", "user", user.id)
-        db.session.commit()
+        users.commit_changes()
     except Exception:
-        db.session.rollback()
+        users.rollback()
         # Do not log the email, temporary password, or SMTP credentials.
         logger.error("No se pudo enviar el correo de recuperación.")
 
 
 def authenticate(user, password):
-    pending = db.session.get(PasswordReplacement, user.id)
+    users = UserRepository()
+    pending = users.find_password_replacement(user.id)
     if user.check_password(password):
         if pending:
-            db.session.delete(pending)
-            db.session.commit()
+            users.delete_password_replacement(pending)
+            users.commit_changes()
         return True
     if pending and utc(pending.expires_at) > datetime.now(timezone.utc) and check_password_hash(pending.password_hash, password):
         user.password_hash = pending.password_hash
-        db.session.delete(pending)
+        users.delete_password_replacement(pending)
         AuditService.record(user.id, "password_replacement_activated", "user", user.id)
-        db.session.commit()
+        users.commit_changes()
         return True
     return False

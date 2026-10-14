@@ -1,23 +1,21 @@
+from flask import abort, current_app, flash, redirect, render_template, request, url_for
+from flask_login import current_user
+
 from app.controllers import main
 from app.controllers.decorators import roles_required
-from app.controllers._support import *
-from app.controllers._support import _teacher_course_metrics, _local_date_bounds_or_none
+from app.services import AttendanceService, CourseService, NoticeService
+from app.services.metrics_service import teacher_course_metrics
 
 
 @main.get("/docente")
 @roles_required("docente")
 def teacher_dashboard():
-    course_models = CourseRepository().list_for_teacher(current_user.id)
-    course_metrics = [_teacher_course_metrics(course) for course in course_models]
+    course_models = CourseService().list_for_teacher(current_user.id)
+    course_metrics = [teacher_course_metrics(course) for course in course_models]
     course_ids = [course.id for course in course_models]
     notices = []
     if course_ids:
-        notices = db.session.scalars(
-            select(Notice)
-            .where(Notice.course_id.in_(course_ids))
-            .order_by(Notice.created_at.desc())
-            .limit(8)
-        ).all()
+        notices = NoticeService().list_for_courses(course_ids, limit=8)
     return render_template(
         "teacher/teacher.html",
         courses=course_models,
@@ -32,10 +30,10 @@ def teacher_dashboard():
 @main.get("/docente/cursos/<int:course_id>")
 @roles_required("docente")
 def teacher_course(course_id):
-    course = CourseRepository().get_for_teacher(course_id, current_user.id)
+    course = CourseService().get_for_teacher(course_id, current_user.id)
     if not course:
         abort(404)
-    metrics = _teacher_course_metrics(course)
+    metrics = teacher_course_metrics(course)
     sort_by = request.args.get("orden", "nombre")
     sort_keys = {
         "nombre": lambda row: row["student"].name.casefold(),
@@ -51,7 +49,7 @@ def teacher_course(course_id):
 @main.get("/docente/estudiantes")
 @roles_required("docente")
 def teacher_students():
-    courses = CourseRepository().list_for_teacher(current_user.id)
+    courses = CourseService().list_for_teacher(current_user.id)
     course_id = request.args.get("curso", type=int)
     selected_course = next(
         (course for course in courses if course.id == course_id), None
@@ -59,7 +57,7 @@ def teacher_students():
     if course_id and not selected_course:
         abort(404)
     selected_courses = [selected_course] if selected_course else courses
-    metrics = [_teacher_course_metrics(course) for course in selected_courses]
+    metrics = [teacher_course_metrics(course) for course in selected_courses]
     students = []
     for course_metrics in metrics:
         for row in course_metrics["students"]:
@@ -78,7 +76,7 @@ def teacher_students():
 @main.get("/docente/historial")
 @roles_required("docente")
 def teacher_history():
-    courses = CourseRepository().list_for_teacher(current_user.id)
+    courses = CourseService().list_for_teacher(current_user.id)
     course_ids = [course.id for course in courses]
     filters = {
         "curso": request.args.get("curso", ""),
@@ -86,42 +84,12 @@ def teacher_history():
         "estudiante": request.args.get("estudiante", "").strip(),
         "estado": request.args.get("estado", ""),
     }
-    conditions = [AttendanceSession.course_id.in_(course_ids)] if course_ids else []
-    if filters["curso"]:
-        if filters["curso"].isdigit() and int(filters["curso"]) in course_ids:
-            conditions.append(AttendanceSession.course_id == int(filters["curso"]))
-        else:
-            conditions.append(AttendanceSession.course_id == -1)
-    if filters["fecha"]:
-        bounds = _local_date_bounds_or_none(filters["fecha"])
-        if bounds:
-            start, end = bounds
-            conditions.extend(
-                [Attendance.recorded_at >= start, Attendance.recorded_at < end]
-            )
-        else:
-            conditions.append(Attendance.id == -1)
-    if filters["estudiante"]:
-        needle = f"%{filters['estudiante']}%"
-        conditions.append(
-            or_(User.name.ilike(needle), User.carnet.ilike(needle))
-        )
-    if filters["estado"] in {"presente", "ausente", "justificado"}:
-        conditions.append(Attendance.status == filters["estado"])
-    total = db.session.scalar(
-        select(func.count(Attendance.id)).select_from(Attendance)
-        .join(AttendanceSession).join(User, Attendance.student_id == User.id)
-        .where(*conditions)
-    ) if conditions else 0
-    pages = max(1, (total + 24) // 25)
-    page = min(max(1, request.args.get("page", 1, type=int)), pages)
-    records = db.session.scalars(
-        select(Attendance).join(AttendanceSession)
-        .join(User, Attendance.student_id == User.id)
-        .where(*conditions)
-        .order_by(Attendance.recorded_at.desc(), Attendance.id.desc())
-        .offset((page - 1) * 25).limit(25)
-    ).all() if conditions else []
+    total, pages, page, records = AttendanceService().teacher_history_data(
+        course_ids,
+        filters,
+        request.args.get("page", 1, type=int),
+        current_app.config["APP_TIMEZONE"],
+    )
     return render_template(
         "teacher/teacher_history.html", courses=courses, records=records, filters=filters,
         page=page, pages=pages, total=total,
@@ -131,27 +99,15 @@ def teacher_history():
 @main.post("/docente/historial/<int:attendance_id>")
 @roles_required("docente")
 def correct_attendance_record(attendance_id):
-    attendance = db.session.get(Attendance, attendance_id)
-    if not attendance or attendance.session.course.teacher_id != current_user.id:
-        abort(404)
     status = request.form.get("status", "")
-    if status not in {"presente", "ausente", "justificado"}:
+    try:
+        corrected = AttendanceService().correct_attendance_record(
+            attendance_id, current_user.id, status
+        )
+    except ValueError:
         abort(400)
-    previous_status = attendance.status
-    attendance.status = status
-    attendance.source = "manual"
-    attendance.modified_by_id = current_user.id
-    attendance.modified_at = datetime.now(timezone.utc)
-    AuditService.record(
-        current_user.id, "attendance_corrected", "attendance", attendance.id,
-        {
-            "student_id": attendance.student_id,
-            "session_id": attendance.session_id,
-            "previous_status": previous_status,
-            "status": status,
-        },
-    )
-    db.session.commit()
+    if not corrected:
+        abort(404)
     flash("Registro corregido manualmente.", "success")
     return redirect(url_for("main.teacher_history"))
 
@@ -161,42 +117,21 @@ def correct_attendance_record(attendance_id):
 def send_teacher_notice():
     course_id = request.form.get("course_id", type=int)
     student_id = request.form.get("student_id", type=int)
-    course = CourseRepository().get_for_teacher(course_id, current_user.id)
+    course = CourseService().get_for_teacher(course_id, current_user.id)
     message = request.form.get("message", "").strip()
     if not course:
         abort(404)
     if not message or len(message) > 500:
         flash("Escribe un aviso de hasta 500 caracteres.", "error")
         return redirect(url_for("main.teacher_dashboard") + "#avisos")
-    if student_id is not None:
-        student = db.session.get(User, student_id)
-        if not student or student not in _course_roster(course.id):
-            abort(404)
-    db.session.add(
-        Notice(
-            course_id=course.id,
-            student_id=student_id,
-            sender_id=current_user.id,
-            message=message,
-            kind="manual" if student_id else "broadcast",
-        )
-    )
-    db.session.commit()
+    if not NoticeService().create_manual_notice(
+        course, student_id, current_user.id, message
+    ):
+        abort(404)
     flash(
         "Aviso enviado al estudiante." if student_id else "Aviso enviado al curso.",
         "success",
     )
     return redirect(url_for("main.teacher_dashboard") + "#avisos")
-
-
-
-
-
-
-
-
-
-
-
 
 

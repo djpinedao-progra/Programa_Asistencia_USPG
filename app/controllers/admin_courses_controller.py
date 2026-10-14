@@ -1,7 +1,13 @@
+import csv
+import io
+
+from flask import Response, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user
+
 from app.controllers import main
 from app.controllers.decorators import roles_required
-from app.controllers._support import *
-from app.controllers._support import _csv_safe, _preview_enrollment_rows
+from app.services import CourseEnrollmentService, CourseService, UserService
+from app.views.reports.csv_builder import csv_safe as _csv_safe
 
 
 @main.route("/admin/cursos/importar", methods=["GET", "POST"])
@@ -11,52 +17,61 @@ def admin_import_course_enrollments():
         return render_template("admin/admin_course_import.html")
 
     if request.form.get("action") in {"import", "download-errors"}:
-        course_codes = request.form.getlist("course_code")
-        carnets = request.form.getlist("carnet")
-        if len(course_codes) != len(carnets):
-            abort(400, description="Las filas del archivo no tienen el mismo formato.")
-        rows = _preview_enrollment_rows(
-            [
-                (index + 2, code, carnet)
-                for index, (code, carnet) in enumerate(zip(course_codes, carnets))
-            ]
-        )
-        if request.form.get("action") == "download-errors":
-            output = io.StringIO(newline="")
-            writer = csv.writer(output)
-            writer.writerow(["line", "course_code", "carnet", "error"])
-            writer.writerows(
-                [row["line"], _csv_safe(row["course_code"]), _csv_safe(row["carnet"]), row["status"]]
-                for row in rows
-                if not row["valid"] and row["status"] != "Ya está matriculado"
-            )
-            return Response(
-                "\ufeff" + output.getvalue(),
-                mimetype="text/csv",
-                headers={
-                    "Content-Disposition": "attachment; filename=matriculas-rechazadas.csv"
-                },
-            )
-        enrollments = [
-            (row["course_id"], row["student_id"])
-            for row in rows if row["valid"]
-        ]
-        try:
-            added = CourseService().bulk_enroll(
-                enrollments, actor_id=current_user.id
-            )
-        except ValueError as error:
-            flash(str(error), "error")
-            return render_template(
-                "admin/admin_course_import.html", rows=rows, preview=False, imported=0
-            )
-        for row in rows:
-            if row["valid"]:
-                row["status"] = "Matriculado"
-        return render_template(
-            "admin/admin_course_import.html", rows=rows, preview=False, imported=added
-        )
+        return _process_enrollment_action(request.form.get("action"))
+    return _preview_enrollment_file()
 
+
+def _process_enrollment_action(action):
+    course_codes = request.form.getlist("course_code")
+    carnets = request.form.getlist("carnet")
+    if len(course_codes) != len(carnets):
+        abort(400, description="Las filas del archivo no tienen el mismo formato.")
+    rows = CourseEnrollmentService().preview_rows(
+        [
+            (index + 2, code, carnet)
+            for index, (code, carnet) in enumerate(zip(course_codes, carnets))
+        ]
+    )
+    if action == "download-errors":
+        output = io.StringIO(newline="")
+        writer = csv.writer(output)
+        writer.writerow(["line", "course_code", "carnet", "error"])
+        writer.writerows(
+            [
+                row["line"],
+                _csv_safe(row["course_code"]),
+                _csv_safe(row["carnet"]),
+                row["status"],
+            ]
+            for row in rows
+            if not row["valid"] and row["status"] != "Ya está matriculado"
+        )
+        return Response(
+            "\ufeff" + output.getvalue(),
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=matriculas-rechazadas.csv"
+            },
+        )
+    enrollments = [
+        (row["course_id"], row["student_id"]) for row in rows if row["valid"]
+    ]
+    try:
+        added = CourseService().bulk_enroll(enrollments, actor_id=current_user.id)
+    except ValueError as error:
+        flash(str(error), "error")
+        return render_template(
+            "admin/admin_course_import.html", rows=rows, preview=False, imported=0
+        )
+    for row in rows:
+        if row["valid"]:
+            row["status"] = "Matriculado"
+    return render_template(
+        "admin/admin_course_import.html", rows=rows, preview=False, imported=added
+    )
+
+
+def _preview_enrollment_file():
     uploaded_file = request.files.get("file")
     if not uploaded_file or not uploaded_file.filename:
         flash("Selecciona un archivo CSV.", "error")
@@ -66,26 +81,10 @@ def admin_import_course_enrollments():
         flash("El archivo supera el límite de 2 MB.", "error")
         return redirect(url_for("main.admin_import_course_enrollments"))
     try:
-        reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
-        headers = {
-            (header or "").strip().casefold(): header
-            for header in (reader.fieldnames or [])
-        }
-        course_header = next(
-            (headers[key] for key in ("course_code", "codigo_curso", "curso") if key in headers),
-            None,
-        )
-        carnet_header = headers.get("carnet")
-        if not course_header or not carnet_header:
-            raise ValueError("El CSV debe incluir las columnas course_code y carnet.")
-        input_rows = [
-            (line_number, row.get(course_header, ""), row.get(carnet_header, ""))
-            for line_number, row in enumerate(reader, start=2)
-        ]
+        rows = CourseEnrollmentService().preview_csv(content)
     except (UnicodeDecodeError, csv.Error, ValueError) as error:
         flash(str(error) or "No se pudo leer el archivo CSV.", "error")
         return redirect(url_for("main.admin_import_course_enrollments"))
-    rows = _preview_enrollment_rows(input_rows)
     return render_template(
         "admin/admin_course_import.html", rows=rows, preview=True, imported=0
     )
@@ -101,3 +100,92 @@ def admin_course_import_template():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=plantilla-matriculas.csv"},
     )
+
+
+@main.post("/admin/cursos")
+@roles_required("admin")
+def admin_create_course():
+    try:
+        teacher_id = int(request.form.get("teacher_id", ""))
+        CourseService().create_course_for_admin(
+            request.form.get("name", ""),
+            request.form.get("code", ""),
+            teacher_id,
+            request.form.get("schedule", ""),
+            request.form.get("location_type", ""),
+            request.form.get("classroom", ""),
+            request.form.getlist("student_ids"),
+            actor_id=current_user.id,
+        )
+        flash("Curso creado y asignaciones guardadas.", "success")
+    except (ValueError, TypeError) as error:
+        flash(str(error) or "El docente seleccionado no es válido.", "error")
+    return redirect(url_for("main.admin_dashboard"))
+
+
+@main.post("/admin/cursos/<int:course_id>/asignaciones")
+@roles_required("admin")
+def admin_update_course(course_id):
+    try:
+        teacher_id = int(request.form.get("teacher_id", ""))
+        CourseService().update_course_roster(
+            course_id,
+            teacher_id,
+            request.form.get("schedule", ""),
+            request.form.get("location_type", ""),
+            request.form.get("classroom", ""),
+            request.form.getlist("student_ids"),
+            request.form.get("is_active") == "on",
+            request.form.get("name", ""),
+            request.form.get("code", ""),
+            actor_id=current_user.id,
+        )
+        flash("Asignación del curso actualizada.", "success")
+    except (ValueError, TypeError) as error:
+        flash(str(error) or "El docente seleccionado no es válido.", "error")
+    return redirect(url_for("main.admin_dashboard"))
+
+
+@main.get("/admin/cursos")
+@roles_required("admin")
+def admin_courses():
+    query = request.args.get("q", "").strip().casefold()
+    teacher_id = request.args.get("docente", type=int)
+    courses = CourseService().list_all()
+    if query:
+        courses = [
+            course for course in courses
+            if query in course.name.casefold() or query in course.code.casefold()
+        ]
+    if teacher_id:
+        courses = [course for course in courses if course.teacher_id == teacher_id]
+    user_service = UserService()
+    teachers = user_service.list_by_role("docente")
+    students = user_service.list_by_role("alumno")
+    return render_template(
+        "admin/admin_courses.html", courses=courses, teachers=teachers,
+        students=students, query=query, selected_teacher=teacher_id,
+    )
+
+
+@main.post("/admin/cursos/<int:course_id>/estado")
+@roles_required("admin")
+def admin_toggle_course(course_id):
+    course_service = CourseService()
+    course = course_service.get_by_id(course_id)
+    if not course:
+        abort(404)
+    try:
+        course_service.set_course_active(
+            course_id,
+            request.form.get("is_active") == "on",
+            actor_id=current_user.id,
+        )
+        flash(
+            "Curso habilitado para el docente." if course.is_active
+            else "Curso deshabilitado; las sesiones abiertas se cerraron.",
+            "success",
+        )
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("main.admin_teachers"))

@@ -2,8 +2,7 @@ import re
 
 from sqlalchemy.exc import IntegrityError
 
-from app.extensions import db
-from app.models import PasswordReplacement, User
+from app.models import User
 from app.repositories import UserRepository
 from app.services.audit_service import AuditService
 
@@ -40,6 +39,18 @@ class UserService:
     def __init__(self, users=None):
         self.users = users or UserRepository()
 
+    def list_all(self):
+        return self.users.list_all()
+
+    def list_by_role(self, role):
+        return self.users.list_by_role(role)
+
+    def find_by_id(self, user_id):
+        return self.users.find_by_id(user_id)
+
+    def find_by_login_identifier(self, identifier):
+        return self.users.find_by_login_identifier(identifier)
+
     def create_user(self, name, email, password, role, carnet="", actor_id=None):
         name, email = name.strip(), email.strip().lower()
         carnet = carnet.strip()
@@ -58,15 +69,14 @@ class UserService:
         user = User(name=name, email=email, carnet=carnet or None, role=role)
         user.set_password(password)
         try:
-            db.session.add(user)
-            db.session.flush()
+            self.users.stage(user)
             AuditService.record(
                 actor_id or user.id, "user_created", "user", user.id,
                 {"role": role},
             )
             return self.users.add(user)
         except IntegrityError as error:
-            db.session.rollback()
+            self.users.rollback()
             raise ValueError("Ya existe una cuenta con ese correo o carnet.") from error
 
     def register_student(self, name, email, carnet, password):
@@ -92,7 +102,7 @@ class UserService:
         try:
             return self.users.save(user)
         except IntegrityError as error:
-            db.session.rollback()
+            self.users.rollback()
             raise ValueError("Ese carnet ya pertenece a otra cuenta.") from error
 
 
@@ -133,7 +143,7 @@ class UserService:
         try:
             return self.users.save(user)
         except IntegrityError as error:
-            db.session.rollback()
+            self.users.rollback()
             raise ValueError("El correo o carnet ya pertenece a otra cuenta.") from error
 
     def change_password(self, user_id, current_password, new_password, confirmation):
@@ -152,15 +162,13 @@ class UserService:
             user, new_password, confirmation, actor_id, "password_reset"
         )
 
-    @classmethod
-    def _save_new_password(cls, user, new_password, confirmation, actor_id, action):
-        cls.validate_password(new_password)
+    def _save_new_password(self, user, new_password, confirmation, actor_id, action):
+        self.validate_password(new_password)
         if new_password != confirmation:
             raise ValueError("La confirmación de contraseña no coincide.")
         user.set_password(new_password)
-        from app.models import PasswordReplacement
-        pending = db.session.get(PasswordReplacement, user.id)
+        pending = self.users.find_password_replacement(user.id)
         if pending:
-            db.session.delete(pending)
+            self.users.delete_password_replacement(pending)
         AuditService.record(actor_id, action, "user", user.id)
-        db.session.commit()
+        self.users.commit_changes()

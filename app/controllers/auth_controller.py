@@ -1,6 +1,9 @@
+from flask import flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
+
 from app.controllers import main
 from app.controllers.decorators import roles_required
-from app.controllers._support import *
+from app.services import UserService
 
 
 @main.route("/", methods=["GET", "POST"])
@@ -10,7 +13,7 @@ def login():
     if request.method == "POST":
         identifier = request.form.get("identifier", "").strip()
         password = request.form.get("password", "")
-        user = UserRepository().find_by_login_identifier(identifier)
+        user = UserService().find_by_login_identifier(identifier)
         from app.recovery import authenticate
         if user and UserService.email_role(user.email) == user.role and authenticate(user, password):
             login_user(user)

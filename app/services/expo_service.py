@@ -15,6 +15,15 @@ class ExpoService:
     def __init__(self, repository=None):
         self.repository = repository or ExpoRepository()
 
+    def count_by_category(self):
+        return self.repository.count_by_category()
+
+    def paginate(self, category=None, per_page=25):
+        return self.repository.paginate(category, per_page=per_page)
+
+    def list_filtered(self, category=None):
+        return self.repository.list_filtered(category)
+
     def register(self, name, email, category, participation, opinion, consent):
         name = name.strip()
         if not 2 <= len(name) <= 120:

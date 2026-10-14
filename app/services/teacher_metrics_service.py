@@ -1,48 +1,27 @@
-from sqlalchemy import func, select
-
-from app.extensions import db
-from app.models import Attendance, AttendanceSession, CourseEnrollment, Notice, User
+from app.models import Notice
+from app.repositories import (
+    AttendanceRepository,
+    AttendanceMetricsRepository,
+    CourseEnrollmentRepository,
+    NoticeRepository,
+    UserRepository,
+)
 
 
 def teacher_course_metrics(course):
-    sessions = db.session.scalars(
-        select(AttendanceSession)
-        .where(
-            AttendanceSession.course_id == course.id,
-            AttendanceSession.closed_at.is_not(None),
-        )
-        .order_by(AttendanceSession.closed_at.desc())
-    ).all()
-    roster = db.session.scalars(
-        select(User)
-        .join(CourseEnrollment, CourseEnrollment.student_id == User.id)
-        .where(CourseEnrollment.course_id == course.id)
-        .order_by(User.id)
-    ).all()
+    attendance_repository = AttendanceRepository()
+    metrics_repository = AttendanceMetricsRepository()
+    sessions = metrics_repository.list_closed_sessions_for_course(course.id)
+    roster = CourseEnrollmentRepository().list_students_for_course(course.id)
     if not roster:
-        historical_student_ids = db.session.scalars(
-            select(Attendance.student_id)
-            .join(AttendanceSession)
-            .where(AttendanceSession.course_id == course.id)
-            .distinct()
-        ).all()
+        historical_student_ids = (
+            metrics_repository.list_historical_student_ids_for_course(course.id)
+        )
         if historical_student_ids:
-            roster = db.session.scalars(
-                select(User)
-                .where(User.id.in_(historical_student_ids))
-                .order_by(User.id)
-            ).all()
+            roster = UserRepository().list_by_ids(historical_student_ids)
     counts_by_student = {}
     if sessions:
-        counts = db.session.execute(
-            select(Attendance.student_id, Attendance.status, func.count())
-            .join(AttendanceSession)
-            .where(
-                AttendanceSession.course_id == course.id,
-                AttendanceSession.closed_at.is_not(None),
-            )
-            .group_by(Attendance.student_id, Attendance.status)
-        ).all()
+        counts = metrics_repository.list_status_counts_for_course(course.id)
         for student_id, status, count in counts:
             counts_by_student.setdefault(student_id, {})[status] = count
     students = []
@@ -78,16 +57,12 @@ def teacher_course_metrics(course):
 
 def create_low_attendance_notices(course, actor_id):
     metrics = teacher_course_metrics(course)
-    existing_ids = set(
-        db.session.scalars(
-            select(Notice.student_id).where(
-                Notice.course_id == course.id, Notice.kind == "automatic"
-            )
-        ).all()
-    )
+    notice_repository = NoticeRepository()
+    existing_ids = set(notice_repository.list_automatic_student_ids(course.id))
+    notices = []
     for row in metrics["students"]:
         if row["percentage"] < 90 and row["student"].id not in existing_ids:
-            db.session.add(
+            notices.append(
                 Notice(
                     course_id=course.id,
                     student_id=row["student"].id,
@@ -99,18 +74,12 @@ def create_low_attendance_notices(course, actor_id):
                     kind="automatic",
                 )
             )
-    db.session.commit()
+    notice_repository.add_all(notices)
 
 
 def course_roster(course_id):
-    enrollments = db.session.scalars(
-        select(CourseEnrollment).where(CourseEnrollment.course_id == course_id)
-    ).all()
+    enrollments = CourseEnrollmentRepository().list_for_course(course_id)
     if enrollments:
         return [enrollment.student for enrollment in enrollments]
-    records = db.session.scalars(
-        select(Attendance)
-        .join(AttendanceSession)
-        .where(AttendanceSession.course_id == course_id)
-    ).all()
+    records = AttendanceRepository().list_for_course_without_order(course_id)
     return list({record.student_id: record.student for record in records}.values())

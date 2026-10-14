@@ -1,12 +1,21 @@
+from datetime import datetime, timezone
+from urllib.parse import urljoin
+
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
+from flask_login import current_user
+
 from app.controllers import main
 from app.controllers.decorators import roles_required
-from app.controllers._support import *
-from app.controllers._support import _course_roster
+from app.services import AttendanceReportService, AttendanceService
+from app.services.metrics_service import (
+    course_roster,
+    create_low_attendance_notices,
+)
 from app.views.reports.qr_builder import build_qr_png
 
 
 def _owned_attendance_session(session_id):
-    attendance_session = db.session.get(AttendanceSession, session_id)
+    attendance_session = AttendanceService().find_session_by_id(session_id)
     if (
         not attendance_session
         or attendance_session.course.teacher_id != current_user.id
@@ -26,14 +35,9 @@ def _remove_teacher_qr_token(session_id):
 
 
 def _save_teacher_qr_token(attendance_session):
-    raw_token = secrets.token_urlsafe(32)
-    attendance_session.token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    attendance_session.expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=min(current_app.config["QR_SESSION_MINUTES"], 1)
-    )
-    attendance_session.active = True
-    attendance_session.closed_at = None
-    db.session.commit()
+    raw_token = AttendanceService(
+        session_minutes=min(current_app.config["QR_SESSION_MINUTES"], 1)
+    ).renew_token(attendance_session)
     tokens = session.get("teacher_qr_tokens", {})
     tokens[str(attendance_session.id)] = raw_token
     session["teacher_qr_tokens"] = tokens
@@ -45,14 +49,8 @@ def _create_low_attendance_notices(course):
 
 
 def _start_attendance_session(course_id):
-    existing_session = db.session.scalar(
-        select(AttendanceSession)
-        .where(
-            AttendanceSession.course_id == course_id,
-            AttendanceSession.active.is_(True),
-            AttendanceSession.closed_at.is_(None),
-        )
-        .order_by(AttendanceSession.created_at.desc())
+    existing_session = AttendanceService().find_open_session_for_course(
+        course_id
     )
     if existing_session and existing_session.course.teacher_id == current_user.id:
         expiration = existing_session.expires_at
@@ -63,30 +61,8 @@ def _start_attendance_session(course_id):
             return redirect(
                 url_for("main.teacher_session", session_id=existing_session.id)
             )
-        now = datetime.now(timezone.utc)
-        existing_ids = set(
-            db.session.scalars(
-                select(Attendance.student_id).where(
-                    Attendance.session_id == existing_session.id
-                )
-            ).all()
-        )
-        for student in _course_roster(course_id):
-            if student.id not in existing_ids:
-                db.session.add(
-                    Attendance(
-                        session_id=existing_session.id,
-                        student_id=student.id,
-                        recorded_at=now,
-                        status="ausente",
-                        source="cierre",
-                        modified_by_id=current_user.id,
-                    )
-                )
-        existing_session.active = False
-        existing_session.closed_at = now
+        AttendanceService().close_session(existing_session, current_user.id)
         _remove_teacher_qr_token(existing_session.id)
-        db.session.commit()
         _create_low_attendance_notices(existing_session.course)
     try:
         attendance_session, raw_token = AttendanceService(
@@ -102,6 +78,37 @@ def _start_attendance_session(course_id):
     return redirect(
         url_for("main.teacher_session", session_id=attendance_session.id)
     )
+
+
+def _teacher_session_context(session_id):
+    attendance_session = _owned_attendance_session(session_id)
+    raw_token = session.get("teacher_qr_tokens", {}).get(str(session_id))
+    if not raw_token and attendance_session.active and not attendance_session.closed_at:
+        raw_token = _save_teacher_qr_token(attendance_session)
+    session_end = attendance_session.expires_at
+    if session_end.tzinfo is None:
+        session_end = session_end.replace(tzinfo=timezone.utc)
+    expired = session_end <= datetime.now(timezone.utc) or not attendance_session.active
+    qr_data = None
+    if raw_token and not expired:
+        destination = urljoin(
+            current_app.config["APP_BASE_URL"] or request.host_url,
+            url_for("main.checkin", token=raw_token),
+        )
+        qr_data = base64.b64encode(build_qr_png(destination)).decode("ascii")
+    attendances = AttendanceService().list_for_session(session_id)
+    return {
+        "attendance_session": attendance_session,
+        "qr_data": qr_data,
+        "attendances": attendances,
+        "students": course_roster(attendance_session.course_id),
+        "attendance_by_student": {
+            attendance.student_id: attendance for attendance in attendances
+        },
+        "expired": expired,
+        "expires_timestamp": int(session_end.timestamp()),
+        "closed": attendance_session.closed_at is not None,
+    }
 
 
 @main.post("/docente/asistencia/iniciar")
@@ -124,37 +131,9 @@ def create_attendance_session(course_id):
 @main.get("/docente/sesiones/<int:session_id>")
 @roles_required("docente")
 def teacher_session(session_id):
-    attendance_session = _owned_attendance_session(session_id)
-    raw_token = session.get("teacher_qr_tokens", {}).get(str(session_id))
-    if not raw_token and attendance_session.active and not attendance_session.closed_at:
-        raw_token = _save_teacher_qr_token(attendance_session)
-    session_end = attendance_session.expires_at
-    if session_end.tzinfo is None:
-        session_end = session_end.replace(tzinfo=timezone.utc)
-    expired = session_end <= datetime.now(timezone.utc) or not attendance_session.active
-    qr_data = None
-    if raw_token and not expired:
-        destination = urljoin(
-            current_app.config["APP_BASE_URL"] or request.host_url,
-            url_for("main.checkin", token=raw_token),
-        )
-        qr_data = base64.b64encode(build_qr_png(destination)).decode("ascii")
-    attendances = db.session.scalars(
-        select(Attendance).where(Attendance.session_id == session_id)
-    ).all()
-    attendance_by_student = {
-        attendance.student_id: attendance for attendance in attendances
-    }
     return render_template(
         "teacher/session.html",
-        attendance_session=attendance_session,
-        qr_data=qr_data,
-        attendances=attendances,
-        students=_course_roster(attendance_session.course_id),
-        attendance_by_student=attendance_by_student,
-        expired=expired,
-        expires_timestamp=int(session_end.timestamp()),
-        closed=attendance_session.closed_at is not None,
+        **_teacher_session_context(session_id),
     )
 
 
@@ -174,34 +153,8 @@ def renew_attendance_qr(session_id):
 @roles_required("docente")
 def attendance_session_status(session_id):
     attendance_session = _owned_attendance_session(session_id)
-    records = {
-        record.student_id: record
-        for record in db.session.scalars(
-            select(Attendance).where(Attendance.session_id == session_id)
-        ).all()
-    }
-    students = []
-    for student in _course_roster(attendance_session.course_id):
-        record = records.get(student.id)
-        students.append(
-            {
-                "id": student.id,
-                "name": student.name,
-                "carnet": student.carnet or "—",
-                "status": record.status if record else "pendiente",
-                "source": record.source if record else "",
-                "recorded_at": (
-                    utc_isoformat(record.recorded_at) if record else None
-                ),
-            }
-        )
     return jsonify(
-        {
-            "students": students,
-            "active": attendance_session.active,
-            "closed": attendance_session.closed_at is not None,
-            "present_count": sum(row["status"] == "presente" for row in students),
-        }
+        AttendanceReportService().session_status_data(attendance_session)
     )
 
 
@@ -211,43 +164,17 @@ def set_session_attendance(session_id, student_id):
     attendance_session = _owned_attendance_session(session_id)
     if not attendance_session.active or attendance_session.closed_at:
         abort(409)
-    student = db.session.get(User, student_id)
-    if not student or student not in _course_roster(attendance_session.course_id):
+    attendance_service = AttendanceService()
+    if not attendance_service.is_course_student(
+        attendance_session.course_id, student_id
+    ):
         abort(404)
     status = request.form.get("status", "")
     if status not in {"presente", "ausente", "justificado"}:
         abort(400)
-    attendance = db.session.scalar(
-        select(Attendance).where(
-            Attendance.session_id == session_id,
-            Attendance.student_id == student_id,
-        )
+    attendance_service.set_manual_attendance(
+        session_id, student_id, current_user.id, status
     )
-    now = datetime.now(timezone.utc)
-    previous_status = attendance.status if attendance else None
-    if attendance is None:
-        attendance = Attendance(
-            session_id=session_id,
-            student_id=student_id,
-            recorded_at=now,
-        )
-        db.session.add(attendance)
-        db.session.flush()
-    else:
-        attendance.modified_at = now
-    attendance.status = status
-    attendance.source = "manual"
-    attendance.modified_by_id = current_user.id
-    AuditService.record(
-        current_user.id, "attendance_corrected", "attendance", attendance.id,
-        {
-            "student_id": student.id,
-            "session_id": session_id,
-            "previous_status": previous_status,
-            "status": status,
-        },
-    )
-    db.session.commit()
     return redirect(url_for("main.teacher_session", session_id=session_id))
 
 
@@ -258,28 +185,8 @@ def close_attendance_session(session_id):
     if attendance_session.closed_at:
         flash("La asistencia ya estaba cerrada.", "warning")
         return redirect(url_for("main.teacher_session", session_id=session_id))
-    now = datetime.now(timezone.utc)
-    existing_ids = set(
-        db.session.scalars(
-            select(Attendance.student_id).where(Attendance.session_id == session_id)
-        ).all()
-    )
-    for student in _course_roster(attendance_session.course_id):
-        if student.id not in existing_ids:
-            db.session.add(
-                Attendance(
-                    session_id=session_id,
-                    student_id=student.id,
-                    recorded_at=now,
-                    status="ausente",
-                    source="cierre",
-                    modified_by_id=current_user.id,
-                )
-            )
-    attendance_session.active = False
-    attendance_session.closed_at = now
+    AttendanceService().close_session(attendance_session, current_user.id)
     _remove_teacher_qr_token(attendance_session.id)
-    db.session.commit()
     _create_low_attendance_notices(attendance_session.course)
     flash("Asistencia cerrada; las faltas pendientes quedaron registradas.", "success")
     return redirect(url_for("main.teacher_session", session_id=session_id))

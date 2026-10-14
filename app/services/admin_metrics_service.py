@@ -1,9 +1,91 @@
-from sqlalchemy import func, select
-
-from app.extensions import db
-from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, User
-from app.repositories import CourseRepository
+from app.repositories import (
+    AttendanceMetricsRepository,
+    CourseRepository,
+    UserRepository,
+)
 from app.utils.time_utils import local_date_utc_bounds
+
+
+def admin_dashboard_data(timezone_name="America/Guatemala"):
+    users = UserRepository().list_all()
+    courses = CourseRepository().list_all()
+    student_summaries = admin_student_summaries(
+        timezone_name=timezone_name
+    )
+    session_summaries = admin_session_summaries(
+        timezone_name=timezone_name
+    )[:6]
+    return {
+        "users": users,
+        "courses": courses,
+        "teachers": [user for user in users if user.role == "docente"],
+        "students": [user for user in users if user.role == "alumno"],
+        "at_risk_students": sum(
+            row["risk"] != "ninguno" for row in student_summaries
+        ),
+        "recent_sessions": session_summaries,
+    }
+
+
+def admin_attendance_overview_data(
+    course_id, session_date, query, risk_filter, timezone_name
+):
+    students = admin_student_summaries(
+        course_id, session_date or None, timezone_name
+    )
+    if query:
+        students = [
+            row
+            for row in students
+            if query in row["student"].name.casefold()
+            or query in (row["student"].carnet or "").casefold()
+        ]
+    if risk_filter in {"alto", "medio", "ninguno"}:
+        students = [row for row in students if row["risk"] == risk_filter]
+    return students
+
+
+def admin_history_data(
+    course_id, teacher_id, session_date, requested_page, timezone_name
+):
+    sessions, total = admin_session_summaries(
+        course_id,
+        teacher_id,
+        session_date or None,
+        page=requested_page,
+        timezone_name=timezone_name,
+    )
+    pages = max(1, (total + 24) // 25)
+    page = min(requested_page, pages)
+    if page != requested_page:
+        sessions, total = admin_session_summaries(
+            course_id,
+            teacher_id,
+            session_date or None,
+            page=page,
+            timezone_name=timezone_name,
+        )
+    return sessions, total, pages, page
+
+
+def admin_report_pdf_data(course, summaries):
+    return {
+        "rows": [
+            {
+                **row,
+                "student_name": row["student"].name,
+                "student_carnet": row["student"].carnet,
+            }
+            for row in summaries
+        ],
+        "title": "Reporte de asistencia" if not course else f"Reporte {course.name}",
+        "subtitle": (
+            "Todos los cursos"
+            if not course
+            else f"Curso {course.code} · {course.schedule or 'Horario pendiente'}"
+        ),
+        "filename": f"reporte-asistencia-{course.code if course else 'general'}.pdf",
+    }
 
 
 def _local_date_bounds_or_none(value, timezone_name):
@@ -18,31 +100,19 @@ def _local_date_bounds_or_none(value, timezone_name):
 def admin_session_summaries(
     course_id=None, teacher_id=None, session_date=None, page=None, page_size=25, timezone_name="America/Guatemala"
 ):
-    statement = select(AttendanceSession).join(Course)
-    conditions = []
-    if course_id:
-        conditions.append(AttendanceSession.course_id == course_id)
-    if teacher_id:
-        conditions.append(Course.teacher_id == teacher_id)
+    date_bounds = None
+    invalid_date = False
     if session_date:
-        bounds = _local_date_bounds_or_none(session_date, timezone_name)
-        if bounds:
-            start, end = bounds
-            conditions.extend(
-                [AttendanceSession.created_at >= start, AttendanceSession.created_at < end]
-            )
-        else:
-            conditions.append(AttendanceSession.id == -1)
-    if conditions:
-        statement = statement.where(*conditions)
-    total = db.session.scalar(
-        select(func.count(AttendanceSession.id)).select_from(AttendanceSession)
-        .join(Course).where(*conditions)
+        date_bounds = _local_date_bounds_or_none(session_date, timezone_name)
+        invalid_date = date_bounds is None
+    sessions, total = AttendanceMetricsRepository().list_admin_session_page(
+        course_id,
+        teacher_id,
+        date_bounds,
+        invalid_date,
+        page,
+        page_size,
     )
-    statement = statement.order_by(AttendanceSession.created_at.desc())
-    if page is not None:
-        statement = statement.offset((page - 1) * page_size).limit(page_size)
-    sessions = db.session.scalars(statement).all()
     summaries = []
     for attendance_session in sessions:
         records = attendance_session.attendances
@@ -63,22 +133,14 @@ def admin_session_summaries(
 
 
 def admin_student_summaries(course_id=None, session_date=None, timezone_name="America/Guatemala"):
-    students = db.session.scalars(
-        select(User).where(User.role == "alumno").order_by(User.name)
-    ).all()
+    students = UserRepository().list_by_role("alumno")
     courses = CourseRepository().list_all()
     course_by_id = {course.id: course for course in courses}
     course_ids_by_student = {student.id: set() for student in students}
-    enrollments = db.session.execute(
-        select(CourseEnrollment.student_id, CourseEnrollment.course_id)
-    ).all()
+    attendance_repository = AttendanceMetricsRepository()
+    enrollments, historical_courses = attendance_repository.list_student_course_links()
     for student_id, enrolled_course_id in enrollments:
         course_ids_by_student.setdefault(student_id, set()).add(enrolled_course_id)
-    historical_courses = db.session.execute(
-        select(Attendance.student_id, AttendanceSession.course_id)
-        .join(AttendanceSession)
-        .distinct()
-    ).all()
     for student_id, historical_course_id in historical_courses:
         course_ids_by_student.setdefault(student_id, set()).add(historical_course_id)
     if course_id:
@@ -94,38 +156,21 @@ def admin_student_summaries(course_id=None, session_date=None, timezone_name="Am
         if selected_id in course_by_id and (not course_id or selected_id == course_id)
     }
     sessions = []
+    date_bounds = None
+    invalid_date = False
+    if session_date:
+        date_bounds = _local_date_bounds_or_none(session_date, timezone_name)
+        invalid_date = date_bounds is None
     if relevant_course_ids:
-        session_statement = select(AttendanceSession).where(
-            AttendanceSession.course_id.in_(relevant_course_ids),
-            AttendanceSession.closed_at.is_not(None),
+        sessions = attendance_repository.list_closed_sessions_for_courses(
+            relevant_course_ids, date_bounds, invalid_date
         )
-        if session_date:
-            bounds = _local_date_bounds_or_none(session_date, timezone_name)
-            if bounds:
-                start, end = bounds
-                session_statement = session_statement.where(
-                    AttendanceSession.created_at >= start,
-                    AttendanceSession.created_at < end,
-                )
-            else:
-                session_statement = session_statement.where(AttendanceSession.id == -1)
-        sessions = db.session.scalars(
-            session_statement.order_by(AttendanceSession.created_at.desc())
-        ).all()
     session_ids = {item.id for item in sessions}
     status_by_student_course = {}
     if session_ids:
-        status_rows = db.session.execute(
-            select(
-                Attendance.student_id,
-                AttendanceSession.course_id,
-                Attendance.status,
-                func.count(),
-            )
-            .join(AttendanceSession)
-            .where(Attendance.session_id.in_(session_ids))
-            .group_by(Attendance.student_id, AttendanceSession.course_id, Attendance.status)
-        ).all()
+        status_rows = attendance_repository.list_status_counts_for_sessions(
+            session_ids
+        )
         for student_id, course_id_for_status, status, count in status_rows:
             status_by_student_course.setdefault(
                 (student_id, course_id_for_status), {}
@@ -180,56 +225,3 @@ def admin_student_summaries(course_id=None, session_date=None, timezone_name="Am
             }
         )
     return summaries
-
-
-def preview_enrollment_rows(input_rows):
-    courses = {
-        course.code.casefold(): course
-        for course in CourseRepository().list_all()
-    }
-    students = {
-        student.carnet: student
-        for student in db.session.scalars(
-            select(User).where(User.role == "alumno", User.carnet.is_not(None))
-        ).all()
-    }
-    existing_enrollments = set(
-        db.session.execute(select(CourseEnrollment.course_id, CourseEnrollment.student_id)).all()
-    )
-    seen = set()
-    results = []
-    for line_number, raw_code, raw_carnet in input_rows:
-        code = (raw_code or "").strip().upper()
-        carnet = (raw_carnet or "").strip()
-        course = courses.get(code.casefold())
-        student = students.get(carnet)
-        valid = False
-        if not code or not carnet:
-            status = "Falta código de curso o carnet"
-        elif not course:
-            status = "Curso no encontrado"
-        elif not course.is_active:
-            status = "El curso está deshabilitado"
-        elif not student:
-            status = "Alumno no encontrado"
-        elif (course.id, student.id) in seen:
-            status = "Duplicado en el archivo"
-        elif (course.id, student.id) in existing_enrollments:
-            status = "Ya está matriculado"
-        else:
-            status = "Listo para matricular"
-            valid = True
-        if course and student:
-            seen.add((course.id, student.id))
-        results.append(
-            {
-                "line": line_number,
-                "course_code": code,
-                "carnet": carnet,
-                "status": status,
-                "valid": valid,
-                "course_id": course.id if course else None,
-                "student_id": student.id if student else None,
-            }
-        )
-    return results

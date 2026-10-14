@@ -96,7 +96,7 @@ def test_report_counts_filters_exports_and_qr(application):
     assert '&lt;script&gt;' in response.text and '<script>alert(1)</script>' not in response.text
     from app.controllers.expo_controller import report_data
     with application.test_request_context('/admin/expo-san-pablo'):
-        category, counts, query = report_data()
+        category, counts = report_data()
         assert counts == {'estudiante':1,'catedratico':1,'publico':1}
     xlsx = client.get('/admin/expo-san-pablo/reporte.xlsx?categoria=estudiante')
     workbook = load_workbook(io.BytesIO(xlsx.data))

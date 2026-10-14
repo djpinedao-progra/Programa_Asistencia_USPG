@@ -1,6 +1,9 @@
+from flask import flash, redirect, render_template, request, url_for
+from flask_login import current_user
+
 from app.controllers import main
 from app.controllers.decorators import roles_required
-from app.controllers._support import *
+from app.services import AttendanceService
 from app.services.metrics_service import student_dashboard_data
 
 

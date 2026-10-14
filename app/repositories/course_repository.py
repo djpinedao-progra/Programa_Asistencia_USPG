@@ -21,6 +21,11 @@ class CourseRepository:
     def find_by_code(self, code):
         return db.session.scalar(select(Course).where(Course.code == code))
 
+    def find_by_code_except(self, code, course_id):
+        return db.session.scalar(
+            select(Course).where(Course.code == code, Course.id != course_id)
+        )
+
     def get_for_teacher(self, course_id, teacher_id):
         return db.session.scalar(
             select(Course).where(
@@ -34,3 +39,17 @@ class CourseRepository:
         db.session.add(course)
         db.session.commit()
         return course
+
+    def stage(self, course):
+        db.session.add(course)
+        db.session.flush()
+        return course
+
+    def delete_enrollment(self, enrollment):
+        db.session.delete(enrollment)
+
+    def commit(self):
+        db.session.commit()
+
+    def rollback(self):
+        db.session.rollback()

@@ -27,6 +27,24 @@ class ExpoRepository:
             select(ExpoAttendance).order_by(ExpoAttendance.recorded_at.desc())
         ).all()
 
+    def list_filtered(self, category=None):
+        query = select(ExpoAttendance).order_by(
+            ExpoAttendance.recorded_at.desc(), ExpoAttendance.id.desc()
+        )
+        if category:
+            query = query.where(ExpoAttendance.category == category)
+        return db.session.scalars(query).all()
+
+    def paginate(self, category=None, per_page=25):
+        query = select(ExpoAttendance).order_by(
+            ExpoAttendance.recorded_at.desc(), ExpoAttendance.id.desc()
+        )
+        if category:
+            query = query.where(ExpoAttendance.category == category)
+        return db.paginate(
+            query, per_page=per_page, max_per_page=per_page
+        )
+
     def count_by_category(self):
         return dict(
             db.session.execute(
