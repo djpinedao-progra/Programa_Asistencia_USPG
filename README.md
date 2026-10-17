@@ -33,6 +33,15 @@ Administrador: estudiantes, docentes, cursos, matrículas CSV, asistencia, repor
 Docente: sesiones QR temporales, registro manual, cursos, avisos y exportaciones.
 Alumno: registro con carnet, historial y escaneo QR.
 Contraseñas con hash, permisos por rol, CSRF y cambio de contraseña.
+
+## Organización MVC
+El código se divide en controladores HTTP (`app/controllers/`), servicios de
+negocio (`app/services/`), repositorios de datos (`app/repositories/`), modelos
+(`app/models/`) y vistas (`app/views/`, que incluye plantillas, estáticos y
+generadores de reportes). La guía para ubicar cambios es
+[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md); los aspectos aún pendientes de la
+migración se documentan en [docs/PENDIENTES.md](docs/PENDIENTES.md).
+
 Diseño rojo, dorado y azul oscuro. Rethink Sans, utilizada en la web de la universidad.
 Logo original descargado sin editar de la web oficial: https://uspg.edu.gt/site/wp-content/uploads/2026/07/LOGO-EDITABLE-USPG-1.png
 Paleta: azul #011931, rojo #AA182B y blanco.

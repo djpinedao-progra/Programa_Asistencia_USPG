@@ -1,0 +1,236 @@
+from datetime import datetime, timezone
+
+from sqlalchemy.exc import IntegrityError
+
+from app.models import Attendance, Course, CourseEnrollment
+from app.repositories import AttendanceRepository, CourseRepository, UserRepository
+from app.services.audit_service import AuditService
+from app.services.course_enrollment_service import CourseEnrollmentService
+
+
+class CourseService:
+    def __init__(self, courses=None, users=None, attendance=None):
+        self.courses = courses or CourseRepository()
+        self.users = users or UserRepository()
+        self.attendance = attendance or AttendanceRepository()
+
+    def list_all(self):
+        return self.courses.list_all()
+
+    def list_for_teacher(self, teacher_id):
+        return self.courses.list_for_teacher(teacher_id)
+
+    def get_by_id(self, course_id):
+        return self.courses.get_by_id(course_id)
+
+    def get_for_teacher(self, course_id, teacher_id):
+        return self.courses.get_for_teacher(course_id, teacher_id)
+
+    def create_course(self, name, code, teacher_id):
+        name, code = name.strip(), code.strip().upper()
+        if not name or not code:
+            raise ValueError("El nombre y el código del curso son obligatorios.")
+        course = Course(name=name, code=code, teacher_id=teacher_id)
+        try:
+            return self.courses.add(course)
+        except IntegrityError as error:
+            self.courses.rollback()
+            raise ValueError("Ese código de curso ya está registrado.") from error
+
+    def create_course_for_admin(
+        self, name, code, teacher_id, schedule, location_type, classroom,
+        student_ids, actor_id=None,
+    ):
+        name, code = name.strip(), code.strip().upper()
+        schedule, classroom = schedule.strip(), classroom.strip()
+        if not name or not code or not schedule:
+            raise ValueError("Completa el nombre, código y horario del curso.")
+        teacher = self.users.find_by_id(teacher_id)
+        if not teacher or teacher.role != "docente":
+            raise ValueError("Selecciona un docente válido para el curso.")
+        if location_type not in {"presencial", "virtual"}:
+            raise ValueError("Selecciona una modalidad válida.")
+        if location_type == "presencial" and not classroom:
+            raise ValueError("Indica el salón del curso presencial.")
+        if location_type == "virtual":
+            classroom = "Virtual"
+        students = CourseEnrollmentService().students_from_ids(student_ids)
+        if self.courses.find_by_code(code):
+            raise ValueError("Ese código de curso ya está registrado.")
+        course = Course(
+            name=name,
+            code=code,
+            teacher_id=teacher.id,
+            schedule=schedule,
+            location_type=location_type,
+            classroom=classroom,
+        )
+        course.enrollments = [
+            CourseEnrollment(student=student) for student in students
+        ]
+        try:
+            self.courses.stage(course)
+            AuditService.record(
+                actor_id, "course_created", "course", course.id,
+                {
+                    "code": course.code,
+                    "teacher_id": teacher.id,
+                    "student_ids": sorted(student.id for student in students),
+                },
+            )
+            self.courses.commit()
+            return course
+        except IntegrityError as error:
+            self.courses.rollback()
+            raise ValueError("No se pudo guardar el curso. Revisa su código.") from error
+
+    def update_course_roster(
+        self,
+        course_id,
+        teacher_id,
+        schedule,
+        location_type,
+        classroom,
+        student_ids,
+        is_active=True,
+        name=None,
+        code=None,
+        actor_id=None,
+    ):
+        course = self.courses.get_by_id(course_id)
+        if not course:
+            raise ValueError("No se encontró el curso.")
+        teacher = self.users.find_by_id(teacher_id)
+        if not teacher or teacher.role != "docente":
+            raise ValueError("Selecciona un docente válido para el curso.")
+        schedule, classroom = schedule.strip(), classroom.strip()
+        if not schedule:
+            raise ValueError("El horario del curso es obligatorio.")
+        if location_type not in {"presencial", "virtual"}:
+            raise ValueError("Selecciona una modalidad válida.")
+        if location_type == "presencial" and not classroom:
+            raise ValueError("Indica el salón del curso presencial.")
+        students = CourseEnrollmentService().students_from_ids(student_ids)
+        name = (name if name is not None else course.name).strip()
+        code = (code if code is not None else course.code).strip().upper()
+        if not name or not code:
+            raise ValueError("El nombre y el código del curso son obligatorios.")
+        duplicate_code = self.courses.find_by_code_except(code, course.id)
+        if duplicate_code:
+            raise ValueError("Ese código de curso ya está registrado.")
+        previous_values = {
+            "name": course.name,
+            "code": course.code,
+            "teacher_id": course.teacher_id,
+            "schedule": course.schedule,
+            "location_type": course.location_type,
+            "classroom": course.classroom,
+            "is_active": course.is_active,
+        }
+        previous_student_ids = {enrollment.student_id for enrollment in course.enrollments}
+        course.name = name
+        course.code = code
+        course.teacher_id = teacher.id
+        course.schedule = schedule
+        course.location_type = location_type
+        course.classroom = "Virtual" if location_type == "virtual" else classroom
+        course.is_active = bool(is_active)
+        selected_ids = {student.id for student in students}
+        existing_ids = {enrollment.student_id for enrollment in course.enrollments}
+        for enrollment in list(course.enrollments):
+            if enrollment.student_id not in selected_ids:
+                self.courses.delete_enrollment(enrollment)
+        for student in students:
+            if student.id not in existing_ids:
+                course.enrollments.append(CourseEnrollment(student=student))
+        try:
+            course_sessions = self.attendance.list_sessions_for_course(course.id)
+            closed_sessions = []
+            for attendance_session in course_sessions:
+                if not course.is_active and attendance_session.closed_at is None:
+                    attendance_session.active = False
+                    attendance_session.closed_at = datetime.now(timezone.utc)
+                if attendance_session.closed_at is not None:
+                    closed_sessions.append(attendance_session)
+            existing_attendance = (
+                self.attendance.list_attendance_pairs_for_course(course.id)
+            )
+            absences = []
+            for student in students:
+                for attendance_session in closed_sessions:
+                    if (student.id, attendance_session.id) not in existing_attendance:
+                        absences.append(
+                            Attendance(
+                                session_id=attendance_session.id,
+                                student_id=student.id,
+                                recorded_at=attendance_session.closed_at,
+                                status="ausente",
+                                source="cierre",
+                            )
+                        )
+            self.attendance.add_many(absences)
+            changed_fields = [
+                field for field, old_value in previous_values.items()
+                if old_value != getattr(course, field)
+            ]
+            added_student_ids = sorted(selected_ids - previous_student_ids)
+            removed_student_ids = sorted(previous_student_ids - selected_ids)
+            if changed_fields or added_student_ids or removed_student_ids:
+                AuditService.record(
+                    actor_id, "course_updated", "course", course.id,
+                    {
+                        "changed_fields": changed_fields,
+                        "added_student_ids": added_student_ids,
+                        "removed_student_ids": removed_student_ids,
+                    },
+                )
+            self.courses.commit()
+        except IntegrityError as error:
+            self.courses.rollback()
+            raise ValueError("No se pudieron actualizar las asignaciones.") from error
+        return course
+
+    def bulk_enroll(self, enrollments, actor_id=None):
+        return CourseEnrollmentService().bulk_enroll(enrollments, actor_id)
+
+    def set_course_active(self, course_id, is_active, actor_id=None):
+        course = self.courses.get_by_id(course_id)
+        if not course:
+            raise ValueError("No se encontró el curso.")
+        previous_active = course.is_active
+        course.is_active = bool(is_active)
+        if not course.is_active:
+            now = datetime.now(timezone.utc)
+            open_sessions = self.attendance.list_sessions_for_course(
+                course.id, open_only=True
+            )
+            absences = []
+            student_ids = {
+                enrollment.student_id for enrollment in course.enrollments
+            }
+            for attendance_session in open_sessions:
+                existing_ids = set(
+                    self.attendance.list_student_ids_for_session(
+                        attendance_session.id
+                    )
+                )
+                for student_id in student_ids - existing_ids:
+                    absences.append(
+                        Attendance(
+                            session_id=attendance_session.id,
+                            student_id=student_id,
+                            recorded_at=now,
+                            status="ausente",
+                            source="cierre",
+                        )
+                    )
+                attendance_session.active = False
+                attendance_session.closed_at = now
+            self.attendance.add_many(absences)
+        if previous_active != course.is_active:
+            AuditService.record(
+                actor_id, "course_availability_changed", "course", course.id,
+                {"is_active": course.is_active},
+            )
+        self.courses.commit()
+        return course

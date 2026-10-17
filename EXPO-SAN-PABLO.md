@@ -1,6 +1,9 @@
 # Asistencia de Expo San Pablo
 
-## Activación en el programa existente
+## Activación en este proyecto independiente
+
+La Expo ya está integrada en este programa de asistencia. Estos pasos preparan
+la base de datos de esta instalación y no requieren modificar otro proyecto.
 
 1. Instalar las dependencias: `pip install -r requirements.txt`.
 2. Crear la tabla nueva conservando los datos actuales: `flask --app run migrate-expo`.

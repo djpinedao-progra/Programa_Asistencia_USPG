@@ -1,0 +1,1 @@
+- Se conservan los blueprints `main` y `expo` para mantener intactos los nombres de endpoint existentes mientras las rutas se distribuyen por controlador.

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Asistencia USPG{% endblock %} · USPG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css', v='20261005-reference3') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css', v='20261005-reference3') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css', v='20261005-reference3') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/screens.css', v='20261005-reference3') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% if current_user.is_authenticated %}admin-layout{% endif %}">
+  {% if current_user.is_authenticated %}
+  {% if current_user.is_authenticated %}
+  <aside class="institution-sidebar">
+    <a class="sidebar-brand" href="{{ url_for('main.admin_dashboard') }}"><img src="{{ url_for('static', filename='img/uspg-official.png') }}" alt="Universidad San Pablo Guatemala"></a>
+    <p class="sidebar-caption">CONTROL DE ASISTENCIA</p>
+    <nav class="admin-nav" aria-label="Navegación principal">
+{% if current_user.role == 'admin' %}{% include "partials/sidebar_admin_links.html" %}
+{% elif current_user.role == 'docente' %}
+<a href="{{ url_for('main.teacher_dashboard') }}">Resumen</a>
+<a href="{{ url_for('main.teacher_dashboard') }}#mis-cursos">Mis cursos</a>
+<a href="{{ url_for('main.teacher_dashboard') }}#tomar-asistencia">Tomar asistencia</a>
+<a href="{{ url_for('main.teacher_students') }}">Estudiantes</a>
+<a href="{{ url_for('main.teacher_history') }}">Historial</a>
+{% else %}
+<a href="{{ url_for('main.student_dashboard') }}">Resumen</a>
+<a href="{{ url_for('main.student_dashboard') }}#mi-asistencia">Mi asistencia</a>
+<a href="{{ url_for('main.student_dashboard') }}#mis-cursos">Mis cursos</a>
+<a href="{{ url_for('main.student_dashboard') }}#avisos">Avisos</a>
+{% endif %}
+<a href="{{ url_for('main.account_security') }}">Seguridad</a>
+</nav>
+    <div class="sidebar-footer">Comunidad USPG<small>Gestión académica</small></div>
+  </aside>
+  {% endif %}
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('main.dashboard') }}" aria-label="Panel de USPG">
+      <img class="header-brand-image" src="{{ url_for('static', filename='img/uspg-official.png') }}" alt="">
+      <span><strong>USPG</strong><small>Control académico</small></span>
+    </a>
+    <div class="topbar-user">
+      <span class="user-name">{{ current_user.name }}</span>
+      <span class="role-label">{{ {'admin': 'Administrador', 'docente': 'Docente', 'alumno': 'Alumno'}[current_user.role] }}</span>
+      <a class="text-link" href="{{ url_for('main.account_security') }}">Seguridad</a>
+      <form method="post" action="{{ url_for('main.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="icon-button" type="submit" aria-label="Cerrar sesión" title="Cerrar sesión">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3m9-7h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6"/></svg>
+        </button>
+      </form>
+    </div>
+  </header>
+  {% endif %}
+  <main class="page-shell {% if not current_user.is_authenticated %}auth-shell{% endif %}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}<div class="flash-stack" role="status">
+        {% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}
+      </div>{% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='js/attendance-course.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/password-feedback.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/live-session.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/notice-filter.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/qr-scanner.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

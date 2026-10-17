@@ -1,0 +1,40 @@
+:root {
+  color-scheme: light;
+  --brand-red: #b5122b;
+  --brand-red-deep: #810d20;
+  --brand-pink: #f8edef;
+  --brand-pink-soft: #fff5f6;
+  --ink: #292324;
+  --ink-soft: #51484a;
+  --muted: #7e7375;
+  --line: #eadfe1;
+  --surface: #ffffff;
+  --canvas: #fffafa;
+  --teal: var(--brand-red);
+  --teal-dark: var(--brand-red-deep);
+  --lime: #ffffff;
+  --coral: #c62838;
+  --gold: #c58a24;
+  --present: #e8f4ec;
+  --present-ink: #356548;
+  --absence: #fdebea;
+  --absence-ink: #a5232c;
+  --radius-control: 9px;
+  --radius-card: 13px;
+  --shadow-sm: 0 1px 3px rgba(56, 24, 30, .06), 0 5px 16px rgba(56, 24, 30, .035);
+  --shadow-hover: 0 8px 22px rgba(75, 10, 20, .11);
+  --focus-ring: 0 0 0 3px rgba(181, 18, 43, .14);
+  --font-body: "Rethink Sans", "Segoe UI", sans-serif;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --shadow: var(--shadow-hover);
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--canvas);
+  font-synthesis: none;
+  font-optical-sizing: auto;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }

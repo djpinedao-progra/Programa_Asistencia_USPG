@@ -2,7 +2,8 @@ import argparse, secrets, getpass
 from pathlib import Path
 from dotenv import load_dotenv
 from app import create_app, db
-from app.models import User, Course, CourseEnrollment
+from app.models import User
+from app.services.seed_service import seed_demo_data
 
 parser = argparse.ArgumentParser(description="Asistencia USPG")
 parser.add_argument("--demo", action="store_true")
@@ -23,24 +24,7 @@ app = create_app(config)
 with app.app_context():
     db.create_all()
     if args.demo:
-        for name, email, role, carnet in [
-            ("Administrador Demo", "admin@administrador.uspg.edu.gt", "admin", None),
-            ("Docente Demo", "docente@catedratico.uspg.edu.gt", "docente", None),
-            ("Estudiante Demo", "alumno@alumno.uspg.edu.gt", "alumno", "2600001")]:
-            if not User.query.filter_by(email=email).first():
-                user = User(name=name, email=email, role=role, carnet=carnet)
-                user.set_password("Demo-USPG-2026!")
-                db.session.add(user)
-        db.session.commit()
-        teacher = User.query.filter_by(email="docente@catedratico.uspg.edu.gt").first()
-        student = User.query.filter_by(email="alumno@alumno.uspg.edu.gt").first()
-        if not Course.query.filter_by(code="DEMO-101").first():
-            course = Course(name="Programación II", code="DEMO-101", teacher_id=teacher.id,
-                            schedule="Sábado 08:00–10:00", classroom="Laboratorio 1")
-            db.session.add(course)
-            db.session.flush()
-            db.session.add(CourseEnrollment(course_id=course.id, student_id=student.id))
-            db.session.commit()
+        seed_demo_data()
         print("DEMO: admin@administrador.uspg.edu.gt / docente@catedratico.uspg.edu.gt / alumno@alumno.uspg.edu.gt")
         print("Contraseña demo: Demo-USPG-2026!")
     elif not User.query.filter_by(role="admin").first():

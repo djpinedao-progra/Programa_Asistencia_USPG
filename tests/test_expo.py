@@ -94,9 +94,9 @@ def test_report_counts_filters_exports_and_qr(application):
     response = client.get('/admin/expo-san-pablo')
     assert response.status_code == 200
     assert '&lt;script&gt;' in response.text and '<script>alert(1)</script>' not in response.text
-    from app.expo import report_data
+    from app.controllers.expo_controller import report_data
     with application.test_request_context('/admin/expo-san-pablo'):
-        category, counts, query = report_data()
+        category, counts = report_data()
         assert counts == {'estudiante':1,'catedratico':1,'publico':1}
     xlsx = client.get('/admin/expo-san-pablo/reporte.xlsx?categoria=estudiante')
     workbook = load_workbook(io.BytesIO(xlsx.data))
@@ -106,7 +106,7 @@ def test_report_counts_filters_exports_and_qr(application):
     assert detail['E2'].value == '=SUM(A1:A2)' and detail['E2'].data_type == 's'
     pdf = client.get('/admin/expo-san-pablo/reporte.pdf')
     assert pdf.status_code == 200 and pdf.data.startswith(b'%PDF')
-    with patch('app.expo.qrcode.make', wraps=__import__('qrcode').make) as make:
+    with patch('app.views.reports.qr_builder.qrcode.make', wraps=__import__('qrcode').make) as make:
         first = client.get('/admin/expo-san-pablo/qr.png')
         second = client.get('/admin/expo-san-pablo/qr.png')
         assert first.data == second.data and first.data.startswith(b'\x89PNG')
