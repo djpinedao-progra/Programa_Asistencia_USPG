@@ -8,6 +8,11 @@ from app.services.seed_service import seed_demo_data
 parser = argparse.ArgumentParser(description="Asistencia USPG")
 parser.add_argument("--demo", action="store_true")
 parser.add_argument("--port", type=int, default=5000)
+parser.add_argument(
+    "--host",
+    default="127.0.0.1",
+    help="Dirección de escucha (usa 0.0.0.0 para permitir acceso desde la red local)",
+)
 args = parser.parse_args()
 root = Path(__file__).resolve().parent
 load_dotenv(root / ".env")
@@ -40,4 +45,6 @@ with app.app_context():
         db.session.add(user)
         db.session.commit()
 print(f"Abre http://127.0.0.1:{args.port} · Ctrl+C para detener")
-app.run(host="127.0.0.1",port=args.port,debug=False)
+if args.host == "0.0.0.0":
+    print(f"Para otros dispositivos de tu red local, usa http://<IP-LAN>:{args.port}")
+app.run(host=args.host, port=args.port, debug=False)
