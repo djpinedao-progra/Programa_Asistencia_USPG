@@ -30,3 +30,20 @@ def test_prepare_database_requires_initial_credentials(app, monkeypatch):
 
     with pytest.raises(RuntimeError, match="ADMIN_EMAIL y ADMIN_PASSWORD"):
         prepare_database(app)
+
+
+def test_prepare_database_can_reset_existing_admin_credentials(app, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAIL", "deploy@administrador.uspg.edu.gt")
+    monkeypatch.setenv("ADMIN_PASSWORD", "Render-USPG-2026!")
+    assert prepare_database(app) is True
+
+    monkeypatch.setenv("ADMIN_EMAIL", "nuevo@administrador.uspg.edu.gt")
+    monkeypatch.setenv("ADMIN_PASSWORD", "Nueva-Clave-2026!")
+    monkeypatch.setenv("RESET_ADMIN_CREDENTIALS", "true")
+
+    assert prepare_database(app) is True
+
+    with app.app_context():
+        admin = db.session.scalar(db.select(User).where(User.role == "admin"))
+        assert admin.email == "nuevo@administrador.uspg.edu.gt"
+        assert admin.check_password("Nueva-Clave-2026!")
