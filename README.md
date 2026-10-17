@@ -58,6 +58,23 @@ Pruebas de navegador: Playwright con Chromium.
 
 Motor original: https://github.com/djpinedao-progra/Programa_Asistencia_USPG
 
+## Despliegue temporal gratuito en Render
+
+El archivo `render.yaml` crea un Web Service y una base PostgreSQL gratuitos
+en la misma región. En Render selecciona **New > Blueprint**, conecta este
+repositorio y usa la rama `main`. Durante la creación, Render solicitará:
+
+- `ADMIN_EMAIL`: un correo terminado en `@administrador.uspg.edu.gt`.
+- `ADMIN_PASSWORD`: una contraseña nueva y segura para producción.
+
+`SECRET_KEY` y `DATABASE_URL` se configuran automáticamente. En cada arranque,
+`prepare_production.py` crea las tablas que falten y solamente crea la cuenta
+administradora cuando todavía no existe ninguna. No se crean usuarios demo.
+
+El plan gratuito es apropiado para la prueba de 15 días: puede tardar cerca de
+un minuto en despertar después de un período sin tráfico. La recuperación por
+correo no está habilitada porque Render Free bloquea los puertos SMTP comunes.
+
 
 ## Rama Luis independiente
 
