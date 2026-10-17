@@ -32,6 +32,8 @@ class AttendanceMetricsRepository:
                 Attendance.recorded_at >= start,
                 Attendance.recorded_at < end,
             )
+        elif invalid_date:
+            query = query.where(False)
         if student_search:
             query = query.join(User, Attendance.student_id == User.id).where(
                 or_(
@@ -43,8 +45,12 @@ class AttendanceMetricsRepository:
             query = query.where(Attendance.status == status)
         query = query.order_by(Attendance.recorded_at.desc())
         total = db.session.execute(select(func.count()).select_from(query.subquery())).scalar_one()
-        rows = db.session.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
-        return rows, total
+        pages = max(1, (total + page_size - 1) // page_size)
+        page = min(max(1, page), pages)
+        rows = db.session.scalars(
+            query.offset((page - 1) * page_size).limit(page_size)
+        ).all()
+        return total, pages, page, rows
 
     def list_admin_session_page(
         self,
