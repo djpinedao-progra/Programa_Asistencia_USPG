@@ -379,10 +379,16 @@ h1, h2, .brand strong { font-family: var(--font-body); }
 .expo-qr a { overflow-wrap: anywhere; }
 .expo-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 16px 0; }
 .expo-text { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 180px; max-width: 350px; }
+.expo-access-control { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.expo-access-control h2, .expo-access-control p:last-child { margin-bottom: 0; }
+.expo-access-control form { flex: 0 0 auto; }
+.expo-closed { border-left: 4px solid var(--error); background: var(--error-surface); }
 @media (max-width: 760px) {
   .expo-stats { grid-template-columns: repeat(2, 1fr); }
   .expo-qr { flex-direction: column; align-items: flex-start; }
   .expo-public { padding: 24px 16px; }
+  .expo-access-control { align-items: stretch; flex-direction: column; }
+  .expo-access-control .button { width: 100%; }
 }
 
 /* Dedicated Expo entry, separate from the academic login form */

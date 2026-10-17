@@ -8,10 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css', v='20261005-reference3') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css', v='20261005-reference3') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css', v='20261005-reference3') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/screens.css', v='20261005-reference3') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css', v='20261017-feedback-colors') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css', v='20261017-feedback-colors') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css', v='20261017-feedback-colors') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/screens.css', v='20261017-feedback-colors') }}">
   {% block head %}{% endblock %}
 </head>
 <body class="{% if current_user.is_authenticated %}admin-layout{% endif %}">
@@ -59,8 +59,8 @@
   {% endif %}
   <main class="page-shell {% if not current_user.is_authenticated %}auth-shell{% endif %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}<div class="flash-stack" role="status">
-        {% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}
+      {% if messages %}<div class="flash-stack">
+        {% for category, message in messages %}<div class="flash flash-{{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>{% endfor %}
       </div>{% endif %}
     {% endwith %}
     {% block content %}{% endblock %}

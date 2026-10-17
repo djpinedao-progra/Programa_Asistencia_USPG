@@ -28,6 +28,7 @@ def app():
         yield application
         db.session.remove()
         db.drop_all()
+        db.engine.dispose()
 
 
 @pytest.fixture
@@ -66,9 +67,9 @@ def sample_data(app):
             name="Programación",
             code="PROG-1",
             teacher_id=teacher.id,
-            schedule="Lunes 08:00",
+            schedule="Lunes, 08:00–10:00",
             location_type="presencial",
-            classroom="A-1",
+            classroom="Salón 1",
         )
         db.session.add(course)
         db.session.flush()

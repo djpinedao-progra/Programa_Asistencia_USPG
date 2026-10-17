@@ -13,6 +13,7 @@
   </div>
   <div class="login-panel">
     <div class="login-form-wrap">
+      {% if expo_access_enabled %}
       <section class="expo-entry-card" aria-labelledby="expo-entry-title">
         <div class="expo-entry-heading"><span class="expo-entry-icon" aria-hidden="true">✦</span><span class="expo-entry-badge">ACCESO PÚBLICO</span></div>
         <h2 id="expo-entry-title">Expo San Pablo</h2>
@@ -21,6 +22,7 @@
         <small>Sin iniciar sesión · Correos personales e institucionales</small>
       </section>
       <div class="login-access-divider"><span>ACCESO AL SISTEMA ACADÉMICO</span></div>
+      {% endif %}
       <p class="eyebrow">UNIVERSIDAD SAN PABLO · GUATEMALA</p>
       <h2>Iniciar sesión</h2>
       <p class="muted">Usa las credenciales de tu cuenta institucional.</p>

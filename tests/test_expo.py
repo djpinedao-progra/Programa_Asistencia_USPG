@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -6,7 +7,7 @@ from openpyxl import load_workbook
 from sqlalchemy import select, func
 
 from app import create_app, db
-from app.models import ExpoAttendance, User
+from app.models import AppSetting, AuditLog, ExpoAttendance, User
 
 
 @pytest.fixture
@@ -24,6 +25,7 @@ def application():
         yield app
         db.session.remove()
         db.drop_all()
+        db.engine.dispose()
 
 
 def submit(client, **changes):
@@ -66,6 +68,73 @@ def test_duplicate_and_csrf(application):
     assert db.session.scalar(select(func.count()).select_from(ExpoAttendance)) == 1
     assert db.session.scalar(select(ExpoAttendance.opinion)) == 'Excelente evento'
     assert client.post('/expo-san-pablo', data={'email': 'otra@gmail.com'}).status_code == 400
+
+
+def test_admin_can_disable_and_enable_public_expo_registration(application):
+    admin_client = application.test_client()
+    sign_in(admin_client, 'admin')
+    admin_client.get('/admin/expo-san-pablo')
+    with admin_client.session_transaction() as session:
+        token = session['csrf_token']
+
+    disabled = admin_client.post(
+        '/admin/expo-san-pablo/acceso',
+        data={'csrf_token': token, 'enabled': '0'},
+        follow_redirects=True,
+    )
+    assert 'Registro deshabilitado' in disabled.text
+    assert 'Habilitar acceso' in disabled.text
+    setting = db.session.get(AppSetting, 'expo_registration_enabled')
+    assert setting.value == 'false'
+    assert db.session.scalar(
+        select(AuditLog).where(AuditLog.action == 'expo_access_changed')
+    )
+
+    public_client = application.test_client()
+    closed_page = public_client.get('/expo-san-pablo')
+    assert 'El acceso está temporalmente deshabilitado' in closed_page.text
+    assert 'Registrar mi asistencia' not in closed_page.text
+    home_while_closed = public_client.get('/')
+    assert 'expo-entry-card' not in home_while_closed.text
+    assert 'Registrar asistencia a la Expo' not in home_while_closed.text
+    rejected = submit(public_client, email='cerrado@example.com')
+    assert rejected.status_code == 403
+    assert db.session.scalar(select(func.count()).select_from(ExpoAttendance)) == 0
+
+    enabled = admin_client.post(
+        '/admin/expo-san-pablo/acceso',
+        data={'csrf_token': token, 'enabled': '1'},
+        follow_redirects=True,
+    )
+    assert 'Registro habilitado' in enabled.text
+    assert 'Deshabilitar acceso' in enabled.text
+    from flask import g
+    g.pop('_login_user', None)
+    fresh_public_client = application.test_client()
+    assert 'Registrar asistencia a la Expo' in fresh_public_client.get('/').text
+    assert submit(public_client, email='abierto@example.com').status_code == 200
+
+
+def test_operation_feedback_uses_success_and_error_colors(application):
+    client = application.test_client()
+
+    successful = submit(client)
+    assert 'flash flash-success' in successful.text
+    assert 'role="status"' in successful.text
+    successful.close()
+
+    invalid = submit(client, email='correo inválido')
+    assert 'flash flash-error' in invalid.text
+    assert 'role="alert"' in invalid.text
+    invalid.close()
+
+    stylesheet = (
+        Path(application.static_folder) / 'css' / 'layout.css'
+    ).read_text(encoding='utf-8')
+    assert '.flash-success' in stylesheet
+    assert 'background: var(--success-surface)' in stylesheet
+    assert '.flash-error' in stylesheet
+    assert 'background: var(--error-surface)' in stylesheet
 
 
 @pytest.mark.parametrize('changes', [{'email': 'correo inválido'}, {'category':'admin'}, {'consent':''},

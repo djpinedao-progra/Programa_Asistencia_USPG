@@ -7,7 +7,21 @@ from flask_login import current_user
 from app.controllers import main
 from app.controllers.decorators import roles_required
 from app.services import CourseEnrollmentService, CourseService, UserService
+from app.services.course_service import (
+    CLASSROOMS,
+    WEEKDAYS,
+    build_schedule,
+    parse_schedule,
+)
 from app.views.reports.csv_builder import csv_safe as _csv_safe
+
+
+def _schedule_from_form():
+    return build_schedule(
+        request.form.getlist("schedule_days"),
+        request.form.get("start_time", ""),
+        request.form.get("end_time", ""),
+    )
 
 
 @main.route("/admin/cursos/importar", methods=["GET", "POST"])
@@ -111,7 +125,7 @@ def admin_create_course():
             request.form.get("name", ""),
             request.form.get("code", ""),
             teacher_id,
-            request.form.get("schedule", ""),
+            _schedule_from_form(),
             request.form.get("location_type", ""),
             request.form.get("classroom", ""),
             request.form.getlist("student_ids"),
@@ -131,7 +145,7 @@ def admin_update_course(course_id):
         CourseService().update_course_roster(
             course_id,
             teacher_id,
-            request.form.get("schedule", ""),
+            _schedule_from_form(),
             request.form.get("location_type", ""),
             request.form.get("classroom", ""),
             request.form.getlist("student_ids"),
@@ -162,9 +176,33 @@ def admin_courses():
     user_service = UserService()
     teachers = user_service.list_by_role("docente")
     students = user_service.list_by_role("alumno")
+    schedule_parts = {
+        course.id: parse_schedule(course.schedule) for course in courses
+    }
+    classroom_occupancy = []
+    for course in CourseService().list_all():
+        parsed = parse_schedule(course.schedule)
+        if (
+            parsed
+            and course.is_active
+            and course.location_type == "presencial"
+            and course.classroom in CLASSROOMS
+        ):
+            classroom_occupancy.append(
+                {
+                    "course_id": course.id,
+                    "course_code": course.code,
+                    "classroom": course.classroom,
+                    "days": [day for day in WEEKDAYS if day in parsed["days"]],
+                    "start": parsed["start"],
+                    "end": parsed["end"],
+                }
+            )
     return render_template(
         "admin/admin_courses.html", courses=courses, teachers=teachers,
         students=students, query=query, selected_teacher=teacher_id,
+        classrooms=CLASSROOMS, weekdays=WEEKDAYS,
+        schedule_parts=schedule_parts, classroom_occupancy=classroom_occupancy,
     )
 
 

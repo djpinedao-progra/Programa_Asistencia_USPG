@@ -32,7 +32,7 @@ def seed_demo_data():
             code="DEMO-101",
             teacher_id=teacher.id,
             schedule="Sábado 08:00–10:00",
-            classroom="Laboratorio 1",
+            classroom="Salón 1",
         )
         course.enrollments = [CourseEnrollment(student=student)]
         courses.add(course)

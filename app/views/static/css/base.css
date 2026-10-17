@@ -19,6 +19,10 @@
   --present-ink: #356548;
   --absence: #fdebea;
   --absence-ink: #a5232c;
+  --success: #2f6f49;
+  --success-surface: #eaf6ee;
+  --error: #b4232f;
+  --error-surface: #fdebec;
   --radius-control: 9px;
   --radius-card: 13px;
   --shadow-sm: 0 1px 3px rgba(56, 24, 30, .06), 0 5px 16px rgba(56, 24, 30, .035);

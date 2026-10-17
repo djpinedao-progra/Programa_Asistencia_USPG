@@ -2,6 +2,7 @@
 import io
 
 from flask import render_template, request, redirect, url_for, flash, send_file, current_app, abort
+from flask_login import current_user
 
 from app.controllers import expo
 from app.controllers.decorators import roles_required
@@ -16,10 +17,18 @@ CATEGORIES = {'estudiante': 'Estudiante', 'catedratico': 'Catedrático', 'public
 
 @expo.route('/expo-san-pablo', methods=['GET', 'POST'])
 def registration():
+    service = ExpoService()
+    access_enabled = service.is_registration_enabled()
     values = request.form if request.method == 'POST' else {}
     if request.method == 'POST':
+        if not access_enabled:
+            flash('El registro de Expo San Pablo está deshabilitado.', 'error')
+            return render_template(
+                'expo/expo_registration.html', categories=CATEGORIES, values=values,
+                registered=False, access_enabled=False,
+            ), 403
         try:
-            registered = ExpoService().register(
+            registered = service.register(
                 request.form.get('name', ''),
                 request.form.get('email', ''),
                 request.form.get('category', ''),
@@ -35,7 +44,8 @@ def registration():
         except ValueError as error:
             flash(str(error), 'error')
     return render_template('expo/expo_registration.html', categories=CATEGORIES, values=values,
-                           registered=request.args.get('registrado') == '1')
+                           registered=request.args.get('registrado') == '1',
+                           access_enabled=access_enabled)
 
 
 def public_url():
@@ -54,10 +64,26 @@ def report_data():
 @expo.get('/admin/expo-san-pablo')
 @roles_required('admin')
 def report():
+    service = ExpoService()
     category, counts = report_data()
-    page = ExpoService().paginate(category, per_page=25)
+    page = service.paginate(category, per_page=25)
     return render_template('expo/expo_report.html', categories=CATEGORIES, category=category,
-                           counts=counts, total=sum(counts.values()), page=page, public_url=public_url())
+                           counts=counts, total=sum(counts.values()), page=page,
+                           public_url=public_url(),
+                           access_enabled=service.is_registration_enabled())
+
+
+@expo.post('/admin/expo-san-pablo/acceso')
+@roles_required('admin')
+def update_access():
+    enabled = request.form.get('enabled') == '1'
+    ExpoService().set_registration_enabled(enabled, actor_id=current_user.id)
+    flash(
+        'Registro público de Expo San Pablo habilitado.' if enabled
+        else 'Registro público de Expo San Pablo deshabilitado.',
+        'success',
+    )
+    return redirect(url_for('expo.report'))
 
 
 @expo.get('/admin/expo-san-pablo/qr.png')
