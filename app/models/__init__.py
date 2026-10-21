@@ -4,6 +4,7 @@ from app.models.course import Course, CourseEnrollment
 from app.models.expo import ExpoAttendance
 from app.models.notice import Notice
 from app.models.password import PasswordReplacement
+from app.models.setting import AppSetting
 from app.models.user import User
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "ExpoAttendance",
     "Notice",
     "PasswordReplacement",
+    "AppSetting",
     "User",
 ]

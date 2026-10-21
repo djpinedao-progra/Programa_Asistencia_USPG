@@ -19,15 +19,19 @@ def test_admin_can_create_course_and_import_valid_enrollment(
             "name": "Bases de datos",
             "code": "bd-101",
             "teacher_id": str(ids["teacher_id"]),
-            "schedule": "Martes 10:00",
+            "schedule_days": ["Martes"],
+            "start_time": "10:00",
+            "end_time": "11:30",
             "location_type": "presencial",
-            "classroom": "B-2",
+            "classroom": "Salón 2",
         },
     )
     assert response.status_code == 302
     with app.app_context():
         course = db.session.scalar(select(Course).where(Course.code == "BD-101"))
         assert course is not None
+        assert course.schedule == "Martes, 10:00–11:30"
+        assert course.classroom == "Salón 2"
         assert db.session.scalar(
             select(AuditLog).where(
                 AuditLog.action == "course_created",
@@ -56,6 +60,125 @@ def test_admin_can_create_course_and_import_valid_enrollment(
             )
         )
         assert enrollment is not None
+
+
+def test_classroom_list_and_schedule_conflicts(
+    app, sample_data, login_as, csrf_token
+):
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+    token = csrf_token(client)
+
+    page = client.get("/admin/cursos")
+    assert page.status_code == 200
+    for number in range(1, 26):
+        assert f'value="Salón {number}"' in page.text
+    assert 'value="Salón 26"' not in page.text
+
+    base_data = {
+        "csrf_token": token,
+        "teacher_id": str(sample_data["teacher_id"]),
+        "schedule_days": ["Martes", "Miércoles"],
+        "start_time": "08:00",
+        "end_time": "09:30",
+        "location_type": "presencial",
+        "classroom": "Salón 5",
+    }
+    created = client.post(
+        "/admin/cursos",
+        data={**base_data, "name": "Curso A", "code": "ROOM-A"},
+    )
+    assert created.status_code == 302
+    with app.app_context():
+        course_a_id = db.session.scalar(
+            select(Course.id).where(Course.code == "ROOM-A")
+        )
+
+    unchanged = client.post(
+        f"/admin/cursos/{course_a_id}/asignaciones",
+        data={
+            **base_data,
+            "name": "Curso A",
+            "code": "ROOM-A",
+            "is_active": "on",
+        },
+        follow_redirects=True,
+    )
+    assert "Asignación del curso actualizada" in unchanged.text
+
+    conflict = client.post(
+        "/admin/cursos",
+        data={
+            **base_data,
+            "name": "Curso B",
+            "code": "ROOM-B",
+            "schedule_days": ["Miércoles"],
+            "start_time": "09:00",
+            "end_time": "10:00",
+        },
+        follow_redirects=True,
+    )
+    assert "Salón 5 ya está ocupado" in conflict.text
+    with app.app_context():
+        assert (
+            db.session.scalar(select(Course).where(Course.code == "ROOM-B"))
+            is None
+        )
+
+    invalid_room = client.post(
+        "/admin/cursos",
+        data={
+            **base_data,
+            "name": "Curso fuera de catálogo",
+            "code": "ROOM-INVALID",
+            "classroom": "Auditorio",
+        },
+        follow_redirects=True,
+    )
+    assert "Selecciona uno de los 25 salones disponibles" in invalid_room.text
+
+    adjacent = client.post(
+        "/admin/cursos",
+        data={
+            **base_data,
+            "name": "Curso C",
+            "code": "ROOM-C",
+            "schedule_days": ["Miércoles"],
+            "start_time": "09:30",
+            "end_time": "10:30",
+        },
+    )
+    assert adjacent.status_code == 302
+    with app.app_context():
+        assert db.session.scalar(select(Course).where(Course.code == "ROOM-C"))
+
+
+def test_virtual_course_does_not_require_classroom(
+    app, sample_data, login_as, csrf_token
+):
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+    token = csrf_token(client)
+    response = client.post(
+        "/admin/cursos",
+        data={
+            "csrf_token": token,
+            "name": "Curso virtual",
+            "code": "VIRTUAL-1",
+            "teacher_id": str(sample_data["teacher_id"]),
+            "schedule_days": ["Viernes"],
+            "start_time": "18:00",
+            "end_time": "20:00",
+            "location_type": "virtual",
+            "classroom": "",
+        },
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        course = db.session.scalar(
+            select(Course).where(Course.code == "VIRTUAL-1")
+        )
+        assert course.classroom == "Virtual"
 
 
 def test_admin_student_summary_and_audit_page_load(

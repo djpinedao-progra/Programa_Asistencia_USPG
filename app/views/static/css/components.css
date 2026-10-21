@@ -16,6 +16,12 @@
 .admin-course-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 22px; border: 1px solid var(--line); background: white; }
 .admin-course-form > label, .notice-compose label { display: grid; gap: 6px; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
 .admin-course-form input:not([type="checkbox"]), .admin-course-form select, .notice-compose select, .notice-compose textarea, .teacher-filter-form select, .teacher-filter-form input, .history-filter-form select, .history-filter-form input { min-width: 0; min-height: 40px; padding: 0 10px; color: var(--ink); border: 1px solid var(--line); border-radius: 2px; background: white; font-size: 12px; }
+.course-schedule-fields { grid-column: 1 / -1; margin: 0; padding: 12px; border: 1px solid var(--line); }
+.course-schedule-fields legend { padding: 0 5px; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
+.course-day-picker { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.course-day-picker label { display: flex; align-items: center; gap: 5px; color: var(--ink-soft); font-size: 10px; }
+.course-day-picker input { accent-color: var(--teal); }
+.room-availability { min-height: 15px; color: var(--muted); font-size: 10px; font-weight: 500; line-height: 1.4; }
 .student-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 15px; max-height: 190px; overflow: auto; grid-column: 1 / -1; margin: 0; padding: 12px; border: 1px solid var(--line); }
 .student-picker legend { padding: 0 5px; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
 .student-picker label { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--ink-soft); font-size: 10px; }
@@ -308,6 +314,7 @@
   .teacher-course-card { padding: 17px; }
   .start-attendance-form { grid-template-columns: 1fr; align-items: stretch; gap: 8px; padding: 16px; }
   .admin-course-form { grid-template-columns: 1fr; padding: 16px; }
+  .course-day-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .student-picker { grid-template-columns: 1fr; max-height: 150px; }
   .admin-course-form > .button { width: 100%; }
   .teacher-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }

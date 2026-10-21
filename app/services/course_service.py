@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import re
+import unicodedata
 
 from sqlalchemy.exc import IntegrityError
 
@@ -6,6 +8,61 @@ from app.models import Attendance, Course, CourseEnrollment
 from app.repositories import AttendanceRepository, CourseRepository, UserRepository
 from app.services.audit_service import AuditService
 from app.services.course_enrollment_service import CourseEnrollmentService
+
+
+CLASSROOMS = tuple(f"Salón {number}" for number in range(1, 26))
+WEEKDAYS = (
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
+)
+
+
+def _normalized(value):
+    return "".join(
+        character for character in unicodedata.normalize("NFD", value.casefold())
+        if unicodedata.category(character) != "Mn"
+    )
+
+
+def parse_schedule(schedule):
+    normalized_schedule = _normalized(schedule or "")
+    days = {
+        day for day in WEEKDAYS if _normalized(day) in normalized_schedule
+    }
+    time_match = re.search(
+        r"\b([01]?\d|2[0-3]):([0-5]\d)\s*[-–—]\s*"
+        r"([01]?\d|2[0-3]):([0-5]\d)\b",
+        schedule or "",
+    )
+    if not days or not time_match:
+        return None
+    start = int(time_match.group(1)) * 60 + int(time_match.group(2))
+    end = int(time_match.group(3)) * 60 + int(time_match.group(4))
+    if start >= end:
+        return None
+    return {
+        "days": days,
+        "start": start,
+        "end": end,
+        "start_time": f"{int(time_match.group(1)):02d}:{time_match.group(2)}",
+        "end_time": f"{int(time_match.group(3)):02d}:{time_match.group(4)}",
+    }
+
+
+def build_schedule(days, start_time, end_time):
+    selected_days = [day for day in WEEKDAYS if day in set(days)]
+    candidate = f"{' y '.join(selected_days)}, {start_time}–{end_time}"
+    parsed = parse_schedule(candidate)
+    if not parsed:
+        raise ValueError(
+            "Selecciona al menos un día y un horario de inicio y fin válido."
+        )
+    return candidate
 
 
 class CourseService:
@@ -50,8 +107,7 @@ class CourseService:
             raise ValueError("Selecciona un docente válido para el curso.")
         if location_type not in {"presencial", "virtual"}:
             raise ValueError("Selecciona una modalidad válida.")
-        if location_type == "presencial" and not classroom:
-            raise ValueError("Indica el salón del curso presencial.")
+        self._validate_schedule_and_classroom(schedule, location_type, classroom)
         if location_type == "virtual":
             classroom = "Virtual"
         students = CourseEnrollmentService().students_from_ids(student_ids)
@@ -108,8 +164,10 @@ class CourseService:
             raise ValueError("El horario del curso es obligatorio.")
         if location_type not in {"presencial", "virtual"}:
             raise ValueError("Selecciona una modalidad válida.")
-        if location_type == "presencial" and not classroom:
-            raise ValueError("Indica el salón del curso presencial.")
+        self._validate_schedule_and_classroom(
+            schedule, location_type, classroom, course.id,
+            course_is_active=bool(is_active),
+        )
         students = CourseEnrollmentService().students_from_ids(student_ids)
         name = (name if name is not None else course.name).strip()
         code = (code if code is not None else course.code).strip().upper()
@@ -189,6 +247,46 @@ class CourseService:
             self.courses.rollback()
             raise ValueError("No se pudieron actualizar las asignaciones.") from error
         return course
+
+    def _validate_schedule_and_classroom(
+        self, schedule, location_type, classroom, excluded_course_id=None,
+        course_is_active=True,
+    ):
+        requested = parse_schedule(schedule)
+        if not requested:
+            raise ValueError(
+                "Selecciona al menos un día y un horario de inicio y fin válido."
+            )
+        if location_type == "virtual":
+            return
+        if classroom not in CLASSROOMS:
+            raise ValueError("Selecciona uno de los 25 salones disponibles.")
+        if not course_is_active:
+            return
+        for existing in self.courses.list_all():
+            if (
+                existing.id == excluded_course_id
+                or not existing.is_active
+                or existing.location_type != "presencial"
+                or existing.classroom != classroom
+            ):
+                continue
+            occupied = parse_schedule(existing.schedule)
+            if not occupied or requested["days"].isdisjoint(occupied["days"]):
+                continue
+            if (
+                requested["start"] < occupied["end"]
+                and occupied["start"] < requested["end"]
+            ):
+                conflicting_days = ", ".join(
+                    day for day in WEEKDAYS
+                    if day in requested["days"] & occupied["days"]
+                )
+                raise ValueError(
+                    f"{classroom} ya está ocupado el {conflicting_days} "
+                    f"de {occupied['start_time']} a {occupied['end_time']} "
+                    f"por {existing.code}."
+                )
 
     def bulk_enroll(self, enrollments, actor_id=None):
         return CourseEnrollmentService().bulk_enroll(enrollments, actor_id)

@@ -72,9 +72,10 @@ td { padding: 13px; border-top: 1px solid var(--line); color: var(--ink-soft); w
 .empty-state strong { font: 700 14px "Rethink Sans", sans-serif; }
 .empty-state p { max-width: 260px; margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .flash-stack { display: grid; gap: 8px; margin: -28px 0 24px; }
-.flash { padding: 12px 15px; border-left: 3px solid var(--teal); background: #fff1f3; font-size: 13px; }
-.flash-error { border-color: var(--coral); background: #fff0eb; }
-.flash-warning { border-color: var(--gold); background: #fff7df; }
+.flash { padding: 12px 15px; border-left: 3px solid var(--muted); background: #f5f2f3; color: var(--ink); font-size: 13px; }
+.flash-success { border-color: var(--success); background: var(--success-surface); color: var(--success); }
+.flash-error { border-color: var(--error); background: var(--error-surface); color: var(--error); }
+.flash-warning { border-color: var(--gold); background: #fff7df; color: #815517; }
 .login-layout { display: grid; min-height: 100vh; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .login-aside { position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; min-height: 100vh; padding: 48px clamp(32px, 7vw, 100px); color: white; background: var(--teal-dark); }
 .login-aside::after { position: absolute; right: -110px; bottom: 100px; width: 340px; height: 340px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 50%; box-shadow: 0 0 0 35px rgba(255, 255, 255, .07), 0 0 0 70px rgba(255, 255, 255, .04); content: ""; }

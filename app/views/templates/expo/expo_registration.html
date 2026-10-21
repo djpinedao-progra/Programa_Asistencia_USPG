@@ -8,7 +8,9 @@
     <h1>Tu participación cuenta.</h1>
     <p class="muted">Registra tu asistencia y comparte tu experiencia. Sin cuenta ni contraseña.</p>
   </header>
-  {% if registered %}
+  {% if not access_enabled %}
+  <div class="panel form-panel expo-closed" role="status"><p class="eyebrow">REGISTRO CERRADO</p><h2>El acceso está temporalmente deshabilitado.</h2><p>El administrador habilitará nuevamente el formulario cuando corresponda.</p></div>
+  {% elif registered %}
   <div class="panel form-panel"><h2>¡Registro completado!</h2><p>Gracias por ser parte de la Expo San Pablo.</p><a class="button" href="{{ url_for('expo.registration') }}">Registrar a otra persona</a></div>
   {% else %}
   <form method="post" class="panel form-panel stack-form">

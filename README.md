@@ -26,6 +26,11 @@ No contiene asistencias inventadas: registra las tuyas al probar.
 Ejecuta python iniciar.py sin --demo. Se crea una base SQLite y se solicita
 la primera cuenta administradora. No copies instance del proyecto anterior.
 Puerto alternativo: python iniciar.py --demo --port 5001.
+Para permitir acceso desde otros dispositivos de la misma red Wi-Fi, inicia con
+`python iniciar.py --demo --host 0.0.0.0` y abre `http://<IP-LAN-del-equipo>:5000`.
+El modo de escucha predeterminado sigue siendo solo local. El servidor de
+desarrollo no debe exponerse directamente a internet; las cuentas demo usan
+credenciales compartidas.
 DATABASE_URL permite usar MySQL si lo configuras en .env.
 
 ## Funciones
@@ -46,12 +51,29 @@ Diseño rojo, dorado y azul oscuro. Rethink Sans, utilizada en la web de la univ
 Logo original descargado sin editar de la web oficial: https://uspg.edu.gt/site/wp-content/uploads/2026/07/LOGO-EDITABLE-USPG-1.png
 Paleta: azul #011931, rojo #AA182B y blanco.
 
-El servidor local abre solo en tu computadora. Cámara móvil requiere HTTPS.
+El servidor local abre solo en tu computadora por defecto. Cámara móvil requiere HTTPS.
 Google Fonts necesita internet; sin conexión usa fuente del sistema.
 Pruebas: python -m pytest -q.
 Pruebas de navegador: Playwright con Chromium.
 
 Motor original: https://github.com/djpinedao-progra/Programa_Asistencia_USPG
+
+## Despliegue temporal gratuito en Render
+
+El archivo `render.yaml` crea un Web Service y una base PostgreSQL gratuitos
+en la misma región. En Render selecciona **New > Blueprint**, conecta este
+repositorio y usa la rama `main`. Durante la creación, Render solicitará:
+
+- `ADMIN_EMAIL`: un correo terminado en `@administrador.uspg.edu.gt`.
+- `ADMIN_PASSWORD`: una contraseña nueva y segura para producción.
+
+`SECRET_KEY` y `DATABASE_URL` se configuran automáticamente. En cada arranque,
+`prepare_production.py` crea las tablas que falten y solamente crea la cuenta
+administradora cuando todavía no existe ninguna. No se crean usuarios demo.
+
+El plan gratuito es apropiado para la prueba de 15 días: puede tardar cerca de
+un minuto en despertar después de un período sin tráfico. La recuperación por
+correo no está habilitada porque Render Free bloquea los puertos SMTP comunes.
 
 
 ## Rama Luis independiente

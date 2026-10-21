@@ -2,10 +2,23 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import ExpoAttendance
+from app.models import AppSetting, ExpoAttendance
 
 
 class ExpoRepository:
+    def get_setting(self, key):
+        return db.session.get(AppSetting, key)
+
+    def set_setting(self, key, value):
+        setting = self.get_setting(key)
+        if setting:
+            setting.value = value
+        else:
+            db.session.add(AppSetting(key=key, value=value))
+
+    def commit(self):
+        db.session.commit()
+
     def find_by_email(self, email):
         return db.session.scalar(
             select(ExpoAttendance.id).where(

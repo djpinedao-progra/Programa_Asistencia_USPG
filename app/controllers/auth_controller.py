@@ -3,7 +3,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 
 from app.controllers import main
 from app.controllers.decorators import roles_required
-from app.services import UserService
+from app.services import ExpoService, UserService
 
 
 @main.route("/", methods=["GET", "POST"])
@@ -22,7 +22,10 @@ def login():
                 return redirect(next_url)
             return redirect(url_for("main.dashboard"))
         flash("Correo o contraseña incorrectos.", "error")
-    return render_template("auth/login.html")
+    return render_template(
+        "auth/login.html",
+        expo_access_enabled=ExpoService().is_registration_enabled(),
+    )
 
 
 @main.route("/registro", methods=["GET", "POST"])
