@@ -404,3 +404,129 @@ h1, h2, .brand strong { font-family: var(--font-body); }
 .login-access-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 25px; color: #687786; font-size: 9px; font-weight: 800; letter-spacing: .7px; }
 .login-access-divider::before, .login-access-divider::after { content: ""; height: 1px; background: #dbe1e8; flex: 1; }
 @media (max-width: 600px) { .expo-entry-card { padding: 20px; } .expo-entry-button { font-size: 12px; } }
+
+/* ===== Admin filter bar (Estudiantes, Docentes, Cursos, Asistencias,
+   Historial, Reportes, Expo) ===== */
+.admin-filter-form,
+.admin-filter-form.admin-attendance-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.admin-filter-form label {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 6px;
+  min-width: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
+.admin-filter-form input,
+.admin-filter-form select {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: #203043;
+  background-color: #fff;
+  border: 1px solid #d5dce6;
+  border-radius: 10px;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.admin-filter-form input::placeholder {
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.admin-filter-form input:hover,
+.admin-filter-form select:hover {
+  border-color: #b9c4d3;
+}
+
+.admin-filter-form input:focus,
+.admin-filter-form input:focus-visible,
+.admin-filter-form select:focus,
+.admin-filter-form select:focus-visible {
+  outline: 0;
+  border-color: #aa182b;
+  box-shadow: 0 0 0 3px rgba(170, 24, 43, .15);
+}
+
+/* Buscador con lupa */
+.admin-filter-form input[type="search"] {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-left: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  background-size: 18px 18px;
+}
+.admin-filter-form input[type="search"]::-webkit-search-cancel-button,
+.admin-filter-form input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Select con flecha propia */
+.admin-filter-form select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 40px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px 16px;
+}
+
+/* Fecha: NO quitar appearance (se perdería el ícono del calendario) */
+.admin-filter-form input[type="date"] {
+  min-width: 150px;
+}
+
+/* Botón y enlace "Limpiar" alineados con los campos */
+.admin-filter-form .button,
+.admin-filter-form .button-small {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 24px;
+  border-radius: 10px;
+}
+.admin-filter-form .text-link,
+.admin-filter-form > a:not(.button) {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #aa182b;
+}
+.admin-filter-form .text-link:hover,
+.admin-filter-form > a:not(.button):hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .admin-filter-form label { flex: 1 1 100%; }
+  .admin-filter-form input,
+  .admin-filter-form select { font-size: 16px; } /* evita zoom en iOS */
+  .admin-filter-form > .button { flex: 1 1 100%; }
+  .admin-filter-form .text-link,
+  .admin-filter-form > a:not(.button) { flex: 1 1 100%; justify-content: center; }
+}
