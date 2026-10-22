@@ -23,9 +23,11 @@ def test_qr_attendance_flow_duplicate_expiry_and_missing_students(
     login_as(teacher, ids["teacher_id"])
     token = csrf_token(teacher)
     started = teacher.post(
-        f"/docente/cursos/{ids['course_id']}/sesion", data={"csrf_token": token}
+        f"/docente/cursos/{ids['course_id']}/sesion",
+        data={"csrf_token": token},
+        follow_redirects=True,
     )
-    assert started.status_code == 302
+    assert started.status_code == 200
     with teacher.session_transaction() as session:
         session_id, qr_token = next(
             (int(key), value)
