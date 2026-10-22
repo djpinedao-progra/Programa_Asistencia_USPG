@@ -22,7 +22,7 @@ def load_config(test_config=None):
         "SESSION_COOKIE_HTTPONLY": True,
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SESSION_COOKIE_SECURE": app_env == "production",
-        "QR_SESSION_MINUTES": 1,
+        "QR_SESSION_MINUTES": 5,
         "APP_BASE_URL": os.getenv(
             "APP_BASE_URL", os.getenv("RENDER_EXTERNAL_URL", "")
         ).rstrip("/"),

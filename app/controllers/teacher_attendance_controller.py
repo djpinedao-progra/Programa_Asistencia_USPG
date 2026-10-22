@@ -37,7 +37,7 @@ def _remove_teacher_qr_token(session_id):
 
 def _save_teacher_qr_token(attendance_session):
     raw_token = AttendanceService(
-        session_minutes=min(current_app.config["QR_SESSION_MINUTES"], 1)
+        session_minutes=current_app.config["QR_SESSION_MINUTES"]
     ).renew_token(attendance_session)
     tokens = session.get("teacher_qr_tokens", {})
     tokens[str(attendance_session.id)] = raw_token
@@ -67,7 +67,7 @@ def _start_attendance_session(course_id):
         _create_low_attendance_notices(existing_session.course)
     try:
         attendance_session, raw_token = AttendanceService(
-            session_minutes=min(current_app.config["QR_SESSION_MINUTES"], 1)
+            session_minutes=current_app.config["QR_SESSION_MINUTES"]
         ).create_session(course_id, current_user.id)
     except ValueError as error:
         flash(str(error), "error")
@@ -75,7 +75,11 @@ def _start_attendance_session(course_id):
     tokens = session.get("teacher_qr_tokens", {})
     tokens[str(attendance_session.id)] = raw_token
     session["teacher_qr_tokens"] = tokens
-    flash("Asistencia iniciada. El código QR vence en 5 minutos.", "success")
+    minutes = current_app.config["QR_SESSION_MINUTES"]
+    flash(
+        f"Asistencia iniciada. El código QR vence en {minutes} minutos.",
+        "success",
+    )
     return redirect(
         url_for("main.teacher_session", session_id=attendance_session.id)
     )
@@ -108,6 +112,7 @@ def _teacher_session_context(session_id):
         },
         "expired": expired,
         "expires_timestamp": int(session_end.timestamp()),
+        "qr_session_minutes": current_app.config["QR_SESSION_MINUTES"],
         "closed": attendance_session.closed_at is not None,
     }
 
@@ -146,7 +151,8 @@ def renew_attendance_qr(session_id):
         flash("La asistencia está cerrada.", "error")
         return redirect(url_for("main.teacher_session", session_id=session_id))
     _save_teacher_qr_token(attendance_session)
-    flash("Nuevo QR activo durante 5 minutos.", "success")
+    minutes = current_app.config["QR_SESSION_MINUTES"]
+    flash(f"Nuevo QR activo durante {minutes} minutos.", "success")
     return redirect(url_for("main.teacher_session", session_id=session_id))
 
 

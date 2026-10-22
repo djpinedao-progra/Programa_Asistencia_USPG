@@ -24,7 +24,7 @@ class AttendanceService:
         self.metrics = AttendanceMetricsRepository()
         self.courses = courses or CourseRepository()
         self.users = users or UserRepository()
-        self.session_minutes = min(session_minutes, 1)
+        self.session_minutes = max(1, int(session_minutes))
 
     def create_session(self, course_id, teacher_id):
         course = self.courses.get_for_teacher(course_id, teacher_id)
