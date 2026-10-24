@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from openpyxl import load_workbook
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from app import create_app, db
 from app.models import AppSetting, AuditLog, ExpoAttendance, User
@@ -58,6 +58,16 @@ def test_public_registration_any_provider(application, email, category):
     assert (row.email, row.category, row.opinion) == (email, category, 'Excelente evento')
     assert db.session.scalar(select(func.count()).select_from(User)) == 2
     assert row.recorded_at is not None
+
+
+def test_completed_registration_offers_new_participant_and_main_menu(application):
+    response = submit(application.test_client())
+
+    assert 'Registrar nuevo participante' in response.text
+    assert 'href="/expo-san-pablo"' in response.text
+    assert 'Regresar al menú principal' in response.text
+    assert 'class="button button-outline" href="/"' in response.text
+    assert 'Registrar a otra persona' not in response.text
 
 
 def test_duplicate_and_csrf(application):
