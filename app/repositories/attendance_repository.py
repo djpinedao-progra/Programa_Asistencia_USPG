@@ -36,6 +36,14 @@ class AttendanceRepository:
             .order_by(AttendanceSession.created_at.desc())
         )
 
+    def list_open_sessions(self):
+        return db.session.scalars(
+            select(AttendanceSession).where(
+                AttendanceSession.active.is_(True),
+                AttendanceSession.closed_at.is_(None),
+            )
+        ).all()
+
     def list_student_ids_for_session(self, session_id):
         return db.session.scalars(
             select(Attendance.student_id).where(

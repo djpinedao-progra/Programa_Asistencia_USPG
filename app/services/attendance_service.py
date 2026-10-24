@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 
@@ -12,19 +13,23 @@ from app.repositories import (
     UserRepository,
 )
 from app.services.audit_service import AuditService
+from app.services.course_service import parse_schedule
 from app.services.metrics_service import course_roster
 from app.utils.time_utils import local_date_bounds_or_none
 
 
 class AttendanceService:
     def __init__(
-        self, attendance=None, courses=None, users=None, session_minutes=1
+        self, attendance=None, courses=None, users=None, session_minutes=1,
+        auto_close_grace_minutes=30, timezone_name="America/Guatemala",
     ):
         self.attendance = attendance or AttendanceRepository()
         self.metrics = AttendanceMetricsRepository()
         self.courses = courses or CourseRepository()
         self.users = users or UserRepository()
         self.session_minutes = max(1, int(session_minutes))
+        self.auto_close_grace_minutes = max(0, int(auto_close_grace_minutes))
+        self.timezone_name = timezone_name
 
     def create_session(self, course_id, teacher_id):
         course = self.courses.get_for_teacher(course_id, teacher_id)
@@ -43,10 +48,64 @@ class AttendanceService:
         return attendance_session, raw_token
 
     def find_session_by_id(self, session_id):
-        return self.attendance.find_session_by_id(session_id)
+        attendance_session = self.attendance.find_session_by_id(session_id)
+        self._close_if_due(attendance_session)
+        return attendance_session
 
     def find_open_session_for_course(self, course_id):
-        return self.attendance.find_open_session_for_course(course_id)
+        attendance_session = self.attendance.find_open_session_for_course(course_id)
+        if self._close_if_due(attendance_session):
+            return None
+        return attendance_session
+
+    def automatic_close_deadline(self, attendance_session):
+        created_at = attendance_session.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        local_created = created_at.astimezone(ZoneInfo(self.timezone_name))
+        grace = timedelta(minutes=self.auto_close_grace_minutes)
+        fallback_deadline = local_created + grace
+        schedule = parse_schedule(attendance_session.course.schedule)
+        weekday = (
+            "Lunes", "Martes", "Miércoles", "Jueves",
+            "Viernes", "Sábado", "Domingo",
+        )[local_created.weekday()]
+        if not schedule or weekday not in schedule["days"]:
+            return fallback_deadline.astimezone(timezone.utc)
+        scheduled_end = local_created.replace(
+            hour=schedule["end"] // 60,
+            minute=schedule["end"] % 60,
+            second=0,
+            microsecond=0,
+        ) + grace
+        return max(scheduled_end, fallback_deadline).astimezone(timezone.utc)
+
+    def close_expired_sessions(self, now=None):
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        closed = 0
+        for attendance_session in self.attendance.list_open_sessions():
+            if self._close_if_due(attendance_session, now):
+                closed += 1
+        return closed
+
+    def _close_if_due(self, attendance_session, now=None):
+        if (
+            not attendance_session
+            or not attendance_session.active
+            or attendance_session.closed_at is not None
+        ):
+            return False
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        if self.automatic_close_deadline(attendance_session) > now:
+            return False
+        self.close_session(
+            attendance_session, attendance_session.course.teacher_id, closed_at=now
+        )
+        return True
 
     def list_for_session(self, session_id):
         return self.attendance.list_for_session(session_id)
@@ -103,6 +162,7 @@ class AttendanceService:
             raise ValueError("El código QR no contiene un token válido.")
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         attendance_session = self.attendance.find_session_by_token_hash(token_hash)
+        self._close_if_due(attendance_session)
         if not attendance_session or not attendance_session.active:
             raise ValueError("La sesión de asistencia no está activa.")
         if not self.attendance.is_student_enrolled(
@@ -136,8 +196,10 @@ class AttendanceService:
         self.attendance.save_session(attendance_session)
         return raw_token
 
-    def close_session(self, attendance_session, actor_id):
-        now = datetime.now(timezone.utc)
+    def close_session(self, attendance_session, actor_id, closed_at=None):
+        if attendance_session.closed_at is not None:
+            return
+        now = closed_at or datetime.now(timezone.utc)
         existing_ids = set(
             self.attendance.list_student_ids_for_session(attendance_session.id)
         )

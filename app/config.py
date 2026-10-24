@@ -23,6 +23,9 @@ def load_config(test_config=None):
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SESSION_COOKIE_SECURE": app_env == "production",
         "QR_SESSION_MINUTES": 5,
+        "ATTENDANCE_CLOSE_GRACE_MINUTES": int(
+            os.getenv("ATTENDANCE_CLOSE_GRACE_MINUTES", "30")
+        ),
         "APP_BASE_URL": os.getenv(
             "APP_BASE_URL", os.getenv("RENDER_EXTERNAL_URL", "")
         ).rstrip("/"),

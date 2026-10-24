@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
 
 from flask import g
 from sqlalchemy import select
 
 from app import db
-from app.models import Attendance, AttendanceSession, CourseEnrollment
+from app.models import Attendance, AttendanceSession, Course, CourseEnrollment
+from app.services.attendance_service import AttendanceService
 
 
 def _login(client, csrf_token, identifier, expected_path):
@@ -249,3 +251,52 @@ def test_qr_attendance_flow_duplicate_expiry_and_missing_students(
         )
         assert absent is not None
         assert absent.status == "ausente"
+
+
+def test_session_auto_closes_after_course_schedule_and_rejects_new_marks(
+    app, sample_data
+):
+    raw_token = "automatic-close-token"
+    with app.app_context():
+        course = db.session.get(Course, sample_data["course_id"])
+        course.schedule = "Martes, 08:00–09:00"
+        opened_at = datetime(2026, 10, 20, 14, 0, tzinfo=timezone.utc)
+        attendance_session = AttendanceSession(
+            course_id=course.id,
+            token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+            created_at=opened_at,
+            expires_at=datetime(2026, 10, 20, 18, 0, tzinfo=timezone.utc),
+            active=True,
+        )
+        db.session.add(attendance_session)
+        db.session.commit()
+
+        service = AttendanceService(
+            auto_close_grace_minutes=30,
+            timezone_name="America/Guatemala",
+        )
+        assert service.automatic_close_deadline(attendance_session) == datetime(
+            2026, 10, 20, 15, 30, tzinfo=timezone.utc
+        )
+        assert service.close_expired_sessions(
+            datetime(2026, 10, 20, 15, 31, tzinfo=timezone.utc)
+        ) == 1
+        assert attendance_session.active is False
+        assert attendance_session.closed_at.replace(tzinfo=timezone.utc) == datetime(
+            2026, 10, 20, 15, 31, tzinfo=timezone.utc
+        )
+        absence = db.session.scalar(
+            select(Attendance).where(
+                Attendance.session_id == attendance_session.id,
+                Attendance.student_id == sample_data["student_id"],
+            )
+        )
+        assert absence.status == "ausente"
+
+        student = absence.student
+        try:
+            service.record_attendance(raw_token, student)
+        except ValueError as error:
+            assert "no está activa" in str(error)
+        else:
+            raise AssertionError("Una sesión cerrada aceptó una nueva marca")

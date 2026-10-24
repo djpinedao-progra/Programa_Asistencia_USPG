@@ -21,6 +21,8 @@ services:
           property: connectionString
       - key: APP_TIMEZONE
         value: America/Guatemala
+      - key: ATTENDANCE_CLOSE_GRACE_MINUTES
+        value: 30
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD

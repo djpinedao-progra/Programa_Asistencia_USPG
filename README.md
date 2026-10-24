@@ -39,6 +39,11 @@ Docente: sesiones QR temporales, registro manual, cursos, avisos y exportaciones
 Alumno: registro con carnet, historial y escaneo QR.
 Contraseñas con hash, permisos por rol, CSRF y cambio de contraseña.
 
+Las sesiones de asistencia se cierran automáticamente al finalizar el horario
+del curso más 30 minutos de gracia. El margen puede cambiarse con
+`ATTENDANCE_CLOSE_GRACE_MINUTES`; si el horario no coincide con el día de
+apertura, el margen se cuenta desde la apertura.
+
 ## Organización MVC
 El código se divide en controladores HTTP (`app/controllers/`), servicios de
 negocio (`app/services/`), repositorios de datos (`app/repositories/`), modelos

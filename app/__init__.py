@@ -37,6 +37,18 @@ def create_app(test_config=None):
     from app.security import register_security_hooks
 
     register_security_hooks(app)
+
+    @app.before_request
+    def close_expired_attendance_sessions():
+        from app.services import AttendanceService
+
+        AttendanceService(
+            auto_close_grace_minutes=app.config[
+                "ATTENDANCE_CLOSE_GRACE_MINUTES"
+            ],
+            timezone_name=app.config["APP_TIMEZONE"],
+        ).close_expired_sessions()
+
     from app.cli import register_commands
 
     register_commands(app)

@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -80,15 +79,14 @@ def register_commands(app):
                             )
                         )
         db.create_all()
-        with db.engine.begin() as connection:
-            connection.execute(
-                text(
-                    "UPDATE attendance_sessions "
-                    "SET active = 0, closed_at = expires_at "
-                    "WHERE closed_at IS NULL AND expires_at < :now"
-                ),
-                {"now": datetime.now(timezone.utc).replace(tzinfo=None)},
-            )
+        from app.services.attendance_service import AttendanceService
+
+        AttendanceService(
+            auto_close_grace_minutes=app.config[
+                "ATTENDANCE_CLOSE_GRACE_MINUTES"
+            ],
+            timezone_name=app.config["APP_TIMEZONE"],
+        ).close_expired_sessions()
         click.echo(
             "Herramientas docentes listas; los datos existentes se conservaron."
         )
