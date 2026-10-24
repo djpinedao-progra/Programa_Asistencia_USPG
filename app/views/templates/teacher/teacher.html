@@ -31,7 +31,7 @@
     <div class="notice-history"><h3>Enviados recientemente</h3>{% for notice in notice_history %}<article><span class="notice-kind">{{ {'automatic': 'Asistencia baja', 'broadcast': 'Curso completo', 'manual': 'Personal'}[notice.kind] }}</span><strong>{{ notice.course.code }}{% if notice.student %} · {{ notice.student.name }}{% else %} · Todo el curso{% endif %}</strong><p>{{ notice.message }}</p><time>{{ (notice.created_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></article>{% else %}<p class="muted">Todavía no has enviado avisos.</p>{% endfor %}</div>
   </div>
   <div class="automatic-alerts"><h3>Observación automática · menos de 90%</h3>
-    {% for item in course_metrics %}{% for row in item.students if row.percentage < 90 %}<article class="automatic-alert {% if row.percentage < 80 %}automatic-alert-risk{% endif %}"><span>{{ row.percentage }}%</span><div><strong>{{ row.student.name }} · {{ item.course.code }}</strong><p>{{ row.absent }} faltas · El mínimo requerido para examen final es 80%.</p></div></article>{% endfor %}{% endfor %}
+    {% for item in course_metrics %}{% for row in item.students if row.has_sessions and row.percentage < 90 %}<article class="automatic-alert {% if row.percentage < 80 %}automatic-alert-risk{% endif %}"><span>{{ row.percentage }}%</span><div><strong>{{ row.student.name }} · {{ item.course.code }}</strong><p>{{ row.absent }} faltas · El mínimo requerido para examen final es 80%.</p></div></article>{% endfor %}{% endfor %}
     {% if students_below_80 == 0 and courses|length == 0 %}<p class="muted">No hay cursos asignados.</p>{% endif %}
   </div>
 </section>

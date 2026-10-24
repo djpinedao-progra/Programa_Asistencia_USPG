@@ -5,11 +5,12 @@ import secrets
 import pytest
 
 from app import db
-from app.models import Attendance, AttendanceSession, User
+from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, User
 from app.services.attendance_service import AttendanceService
 from app.services.attendance_calculation_service import attendance_percentage
 from app.services.expo_service import ExpoService
 from app.services.metrics_service import admin_student_summaries
+from app.services.student_metrics_service import student_dashboard_data
 
 
 @pytest.mark.parametrize(
@@ -23,6 +24,41 @@ def test_attendance_percentage_counts_justified_absences(
     present, justified, sessions, expected
 ):
     assert attendance_percentage(present, justified, sessions) == expected
+
+
+def test_course_without_sessions_has_no_risk_or_misleading_percentage(
+    app, sample_data, login_as
+):
+    with app.app_context():
+        course = Course(
+            name="Curso sin sesiones",
+            code="EMPTY-1",
+            teacher_id=sample_data["teacher_id"],
+            schedule="Viernes, 14:00–16:00",
+            location_type="virtual",
+            classroom="Virtual",
+        )
+        db.session.add(course)
+        db.session.flush()
+        db.session.add(
+            CourseEnrollment(
+                course_id=course.id, student_id=sample_data["outsider_id"]
+            )
+        )
+        db.session.commit()
+
+        data = student_dashboard_data(sample_data["outsider_id"])
+        assert data["total_sessions"] == 0
+        assert data["overall_percentage"] == 0
+        assert data["notices"] == []
+
+    client = app.test_client()
+    login_as(client, sample_data["outsider_id"])
+    response = client.get("/alumno")
+    assert response.status_code == 200
+    assert "Sin sesiones" in response.text
+    assert "100 por ciento de faltas" not in response.text
+    assert "Riesgo de perder derecho" not in response.text
 
 
 def test_metrics_calculate_percentage_and_risk_levels(app, sample_data):

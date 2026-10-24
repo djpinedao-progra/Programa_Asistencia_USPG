@@ -72,7 +72,11 @@ def student_dashboard_data(student_id, page_number=1):
     overall_percentage = attendance_percentage(
         total_attended, total_justified, total_sessions
     )
-    notices = [course for course in courses if course["percentage"] < 90]
+    notices = [
+        course
+        for course in courses
+        if course["total_sessions"] and course["percentage"] < 90
+    ]
     received_notices = NoticeRepository().list_for_student_courses(
         course_ids, student_id, limit=20
     )

@@ -39,6 +39,7 @@ def teacher_course_metrics(course):
                 "absent": absent,
                 "justified": justified,
                 "percentage": percentage,
+                "has_sessions": bool(sessions),
             }
         )
     slots = len(sessions) * len(students)
@@ -51,7 +52,10 @@ def teacher_course_metrics(course):
         "student_count": len(students),
         "sessions_count": len(sessions),
         "average_percentage": attendance_percentage(attended_slots, 0, slots),
-        "below_80": sum(student["percentage"] < 80 for student in students),
+        "below_80": sum(
+            student["has_sessions"] and student["percentage"] < 80
+            for student in students
+        ),
         "present_count": sum(student["present"] for student in students),
         "absence_count": sum(student["absent"] for student in students),
         "justified_count": sum(student["justified"] for student in students),
@@ -60,6 +64,8 @@ def teacher_course_metrics(course):
 
 def create_low_attendance_notices(course, actor_id):
     metrics = teacher_course_metrics(course)
+    if not metrics["sessions_count"]:
+        return
     notice_repository = NoticeRepository()
     existing_ids = set(notice_repository.list_automatic_student_ids(course.id))
     notices = []
