@@ -150,8 +150,7 @@ def register_commands(app):
     )
     def reset_demo_command(backup_destination, yes):
         """Remove all data except the configured administrator account."""
-        from app.backup import create_backup
-        from app.models import User
+        from app.services.demo_reset_service import reset_demo_data
 
         if not yes:
             click.confirm(
@@ -160,41 +159,13 @@ def register_commands(app):
                 abort=True,
             )
 
-        configured_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-        administrators = list(
-            db.session.scalars(
-                select(User).where(User.role == "admin").order_by(User.id)
-            )
-        )
-        administrator = next(
-            (
-                user
-                for user in administrators
-                if configured_email and user.email == configured_email
-            ),
-            None,
-        )
-        if administrator is None and len(administrators) == 1:
-            administrator = administrators[0]
-        if administrator is None:
-            raise click.ClickException(
-                "No se encontró un administrador único que se pueda conservar."
-            )
-
         try:
-            table_count, row_count = create_backup(backup_destination)
-            for table in reversed(db.metadata.sorted_tables):
-                statement = table.delete()
-                if table.name == User.__tablename__:
-                    statement = statement.where(table.c.id != administrator.id)
-                db.session.execute(statement)
-            db.session.commit()
+            administrator, table_count, row_count = reset_demo_data(
+                backup_destination,
+                os.getenv("ADMIN_EMAIL", ""),
+            )
         except (OSError, ValueError) as error:
-            db.session.rollback()
             raise click.ClickException(str(error)) from error
-        except Exception:
-            db.session.rollback()
-            raise
 
         click.echo(
             f"Demo limpia. Se conservó el administrador {administrator.email}. "

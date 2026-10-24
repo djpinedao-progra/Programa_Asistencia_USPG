@@ -1,5 +1,6 @@
 """Initialize an external database without creating demo accounts."""
 import os
+from pathlib import Path
 
 from app import db
 from app.models import User
@@ -10,6 +11,32 @@ def prepare_database(application):
     """Create the schema and the first admin; safe to run on every boot."""
     with application.app_context():
         db.create_all()
+        reset_demo = os.getenv("RESET_DEMO_DATA", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "si",
+            "sí",
+        }
+        if reset_demo:
+            from app.services.demo_reset_service import reset_demo_data
+
+            backup_path = Path(
+                os.getenv(
+                    "DEMO_RESET_BACKUP_PATH",
+                    "/tmp/uspg-before-demo-reset.gz",
+                )
+            )
+            administrator, table_count, row_count = reset_demo_data(
+                backup_path,
+                os.getenv("ADMIN_EMAIL", ""),
+            )
+            print(
+                "Demo limpia. Se conservó el administrador "
+                f"{administrator.email}. Respaldo temporal: {backup_path} "
+                f"({row_count} filas en {table_count} tablas)."
+            )
+            return True
         existing_admin = db.session.scalar(
             db.select(User).where(User.role == "admin").order_by(User.id)
         )
