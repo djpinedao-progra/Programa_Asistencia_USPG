@@ -43,13 +43,15 @@ def _course_error_field(message):
 
 
 def _render_admin_courses(form_data=None, field_errors=None, status=200):
-    query = request.args.get("q", "").strip().casefold()
+    query = request.args.get("q", "").strip()
+    normalized_query = query.casefold()
     teacher_id = request.args.get("docente", type=int)
     courses = CourseService().list_all()
-    if query:
+    if normalized_query:
         courses = [
             course for course in courses
-            if query in course.name.casefold() or query in course.code.casefold()
+            if normalized_query in course.name.casefold()
+            or normalized_query in course.code.casefold()
         ]
     if teacher_id:
         courses = [course for course in courses if course.teacher_id == teacher_id]

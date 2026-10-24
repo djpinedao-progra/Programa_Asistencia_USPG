@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import select
 
 from app import db
@@ -285,6 +286,29 @@ def test_create_course_validation_preserves_submitted_values(
     assert 'value="Viernes" checked' in response.text
     assert "Ese código de curso ya está registrado" in response.text
     assert 'class="field-error" role="alert"' in response.text
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/admin/docentes?q=SinCoincidencias",
+        "/admin/estudiantes?q=SinCoincidencias",
+        "/admin/cursos?q=SinCoincidencias",
+    ],
+)
+def test_admin_directories_distinguish_search_without_results(
+    app, sample_data, login_as, path
+):
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert "No hay resultados para «SinCoincidencias»" in response.text
+    assert "No hay docentes registrados" not in response.text
+    assert "No hay estudiantes registrados" not in response.text
+    assert "No hay cursos registrados" not in response.text
 
 
 def test_admin_student_summary_and_audit_page_load(

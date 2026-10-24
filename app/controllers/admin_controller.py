@@ -52,7 +52,8 @@ def update_student_carnet(user_id):
 @main.get("/admin/estudiantes")
 @roles_required("admin")
 def admin_students():
-    query = request.args.get("q", "").strip().casefold()
+    query = request.args.get("q", "").strip()
+    normalized_query = query.casefold()
     course_id = request.args.get("curso", type=int)
     courses = CourseService().list_all()
     if course_id and not any(course.id == course_id for course in courses):
@@ -61,12 +62,12 @@ def admin_students():
         course_id=course_id,
         timezone_name=current_app.config["APP_TIMEZONE"],
     )
-    if query:
+    if normalized_query:
         students = [
             row for row in students
-            if query in row["student"].name.casefold()
-            or query in row["student"].email.casefold()
-            or query in (row["student"].carnet or "").casefold()
+            if normalized_query in row["student"].name.casefold()
+            or normalized_query in row["student"].email.casefold()
+            or normalized_query in (row["student"].carnet or "").casefold()
         ]
     return render_template(
         "admin/admin_students.html", students=students, courses=courses,
@@ -77,12 +78,14 @@ def admin_students():
 @main.get("/admin/docentes")
 @roles_required("admin")
 def admin_teachers():
-    query = request.args.get("q", "").strip().casefold()
+    query = request.args.get("q", "").strip()
+    normalized_query = query.casefold()
     teachers = UserService().list_by_role("docente")
-    if query:
+    if normalized_query:
         teachers = [
             teacher for teacher in teachers
-            if query in teacher.name.casefold() or query in teacher.email.casefold()
+            if normalized_query in teacher.name.casefold()
+            or normalized_query in teacher.email.casefold()
         ]
     return render_template("admin/admin_teachers.html", teachers=teachers, query=query)
 
