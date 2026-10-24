@@ -181,6 +181,80 @@ def test_virtual_course_does_not_require_classroom(
         assert course.classroom == "Virtual"
 
 
+def test_admin_rejects_overlapping_teacher_schedule_on_create_and_update(
+    app, sample_data, login_as, csrf_token
+):
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+    token = csrf_token(client)
+    base_data = {
+        "csrf_token": token,
+        "teacher_id": str(sample_data["teacher_id"]),
+        "schedule_days": ["Sábado"],
+        "location_type": "presencial",
+    }
+    first = client.post(
+        "/admin/cursos",
+        data={
+            **base_data,
+            "name": "Curso base docente",
+            "code": "DOC-A",
+            "start_time": "07:30",
+            "end_time": "08:30",
+            "classroom": "Salón 1",
+        },
+    )
+    assert first.status_code == 302
+
+    overlap = client.post(
+        "/admin/cursos",
+        data={
+            **base_data,
+            "name": "Curso superpuesto",
+            "code": "DOC-B",
+            "start_time": "08:00",
+            "end_time": "09:00",
+            "classroom": "Salón 2",
+        },
+        follow_redirects=True,
+    )
+    assert "El docente ya imparte DOC-A" in overlap.text
+
+    adjacent = client.post(
+        "/admin/cursos",
+        data={
+            **base_data,
+            "name": "Curso contiguo",
+            "code": "DOC-C",
+            "start_time": "08:30",
+            "end_time": "09:30",
+            "classroom": "Salón 2",
+        },
+    )
+    assert adjacent.status_code == 302
+    with app.app_context():
+        course = db.session.scalar(select(Course).where(Course.code == "DOC-C"))
+        course_id = course.id
+
+    update = client.post(
+        f"/admin/cursos/{course_id}/asignaciones",
+        data={
+            **base_data,
+            "name": "Curso contiguo",
+            "code": "DOC-C",
+            "start_time": "08:15",
+            "end_time": "09:30",
+            "classroom": "Salón 2",
+            "is_active": "on",
+        },
+        follow_redirects=True,
+    )
+    assert "El docente ya imparte DOC-A" in update.text
+    with app.app_context():
+        course = db.session.get(Course, course_id)
+        assert course.schedule.endswith("08:30–09:30")
+
+
 def test_admin_student_summary_and_audit_page_load(
     app, sample_data, login_as
 ):

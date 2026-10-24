@@ -107,7 +107,9 @@ class CourseService:
             raise ValueError("Selecciona un docente válido para el curso.")
         if location_type not in {"presencial", "virtual"}:
             raise ValueError("Selecciona una modalidad válida.")
-        self._validate_schedule_and_classroom(schedule, location_type, classroom)
+        self._validate_schedule_and_classroom(
+            schedule, location_type, classroom, teacher.id
+        )
         if location_type == "virtual":
             classroom = "Virtual"
         students = CourseEnrollmentService().students_from_ids(student_ids)
@@ -165,7 +167,7 @@ class CourseService:
         if location_type not in {"presencial", "virtual"}:
             raise ValueError("Selecciona una modalidad válida.")
         self._validate_schedule_and_classroom(
-            schedule, location_type, classroom, course.id,
+            schedule, location_type, classroom, teacher.id, course.id,
             course_is_active=bool(is_active),
         )
         students = CourseEnrollmentService().students_from_ids(student_ids)
@@ -249,7 +251,8 @@ class CourseService:
         return course
 
     def _validate_schedule_and_classroom(
-        self, schedule, location_type, classroom, excluded_course_id=None,
+        self, schedule, location_type, classroom, teacher_id,
+        excluded_course_id=None,
         course_is_active=True,
     ):
         requested = parse_schedule(schedule)
@@ -257,9 +260,7 @@ class CourseService:
             raise ValueError(
                 "Selecciona al menos un día y un horario de inicio y fin válido."
             )
-        if location_type == "virtual":
-            return
-        if classroom not in CLASSROOMS:
+        if location_type == "presencial" and classroom not in CLASSROOMS:
             raise ValueError("Selecciona uno de los 25 salones disponibles.")
         if not course_is_active:
             return
@@ -267,8 +268,6 @@ class CourseService:
             if (
                 existing.id == excluded_course_id
                 or not existing.is_active
-                or existing.location_type != "presencial"
-                or existing.classroom != classroom
             ):
                 continue
             occupied = parse_schedule(existing.schedule)
@@ -282,11 +281,21 @@ class CourseService:
                     day for day in WEEKDAYS
                     if day in requested["days"] & occupied["days"]
                 )
-                raise ValueError(
-                    f"{classroom} ya está ocupado el {conflicting_days} "
-                    f"de {occupied['start_time']} a {occupied['end_time']} "
-                    f"por {existing.code}."
-                )
+                if (
+                    location_type == "presencial"
+                    and existing.location_type == "presencial"
+                    and existing.classroom == classroom
+                ):
+                    raise ValueError(
+                        f"{classroom} ya está ocupado el {conflicting_days} "
+                        f"de {occupied['start_time']} a {occupied['end_time']} "
+                        f"por {existing.code}."
+                    )
+                if existing.teacher_id == teacher_id:
+                    raise ValueError(
+                        f"El docente ya imparte {existing.code} el {conflicting_days} "
+                        f"de {occupied['start_time']} a {occupied['end_time']}."
+                    )
 
     def bulk_enroll(self, enrollments, actor_id=None):
         return CourseEnrollmentService().bulk_enroll(enrollments, actor_id)
