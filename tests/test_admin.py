@@ -255,6 +255,38 @@ def test_admin_rejects_overlapping_teacher_schedule_on_create_and_update(
         assert course.schedule.endswith("08:30–09:30")
 
 
+def test_create_course_validation_preserves_submitted_values(
+    app, sample_data, login_as, csrf_token
+):
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+    response = client.post(
+        "/admin/cursos",
+        data={
+            "csrf_token": csrf_token(client),
+            "name": "Curso conservado",
+            "code": "PROG-1",
+            "teacher_id": str(sample_data["teacher_id"]),
+            "schedule_days": ["Viernes"],
+            "start_time": "14:00",
+            "end_time": "16:00",
+            "location_type": "presencial",
+            "classroom": "Salón 7",
+            "student_ids": [str(sample_data["student_id"])],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.request.path == "/admin/cursos"
+    assert 'value="Curso conservado"' in response.text
+    assert 'value="PROG-1"' in response.text
+    assert 'value="14:00"' in response.text
+    assert 'value="Salón 7" selected' in response.text
+    assert 'value="Viernes" checked' in response.text
+    assert "Ese código de curso ya está registrado" in response.text
+    assert 'class="field-error" role="alert"' in response.text
+
+
 def test_admin_student_summary_and_audit_page_load(
     app, sample_data, login_as
 ):

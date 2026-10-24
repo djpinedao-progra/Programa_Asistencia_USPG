@@ -170,6 +170,7 @@
 .admin-create-course .admin-course-form { border: 0; border-top: 1px solid var(--line); }
 .course-active-toggle { display: flex !important; align-items: center; gap: 8px !important; }
 .course-active-toggle input { accent-color: var(--teal); }
+.field-error { display: block; margin-top: 6px; color: var(--error); font-weight: 700; }
 .admin-report-chart { margin: 20px 0 28px; padding: 22px; border: 1px solid var(--line); background: white; }
 .report-bar-row { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(80px, 2fr) 42px; align-items: center; gap: 12px; margin: 12px 0; }
 .report-bar-row > span { overflow: hidden; color: var(--ink-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }

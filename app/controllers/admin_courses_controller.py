@@ -24,6 +24,69 @@ def _schedule_from_form():
     )
 
 
+def _course_error_field(message):
+    field_rules = (
+        ("código", "code"),
+        ("docente", "teacher_id"),
+        ("modalidad", "location_type"),
+        ("salón", "classroom"),
+        ("ocupado", "classroom"),
+        ("horario", "schedule_days"),
+        ("día", "schedule_days"),
+        ("alumno", "student_ids"),
+    )
+    normalized = message.casefold()
+    return next(
+        (field for fragment, field in field_rules if fragment in normalized),
+        "name",
+    )
+
+
+def _render_admin_courses(form_data=None, field_errors=None, status=200):
+    query = request.args.get("q", "").strip().casefold()
+    teacher_id = request.args.get("docente", type=int)
+    courses = CourseService().list_all()
+    if query:
+        courses = [
+            course for course in courses
+            if query in course.name.casefold() or query in course.code.casefold()
+        ]
+    if teacher_id:
+        courses = [course for course in courses if course.teacher_id == teacher_id]
+    user_service = UserService()
+    teachers = user_service.list_by_role("docente")
+    students = user_service.list_by_role("alumno")
+    schedule_parts = {
+        course.id: parse_schedule(course.schedule) for course in courses
+    }
+    classroom_occupancy = []
+    for course in CourseService().list_all():
+        parsed = parse_schedule(course.schedule)
+        if (
+            parsed
+            and course.is_active
+            and course.location_type == "presencial"
+            and course.classroom in CLASSROOMS
+        ):
+            classroom_occupancy.append(
+                {
+                    "course_id": course.id,
+                    "course_code": course.code,
+                    "classroom": course.classroom,
+                    "days": [day for day in WEEKDAYS if day in parsed["days"]],
+                    "start": parsed["start"],
+                    "end": parsed["end"],
+                }
+            )
+    return render_template(
+        "admin/admin_courses.html", courses=courses, teachers=teachers,
+        students=students, query=query, selected_teacher=teacher_id,
+        classrooms=CLASSROOMS, weekdays=WEEKDAYS,
+        schedule_parts=schedule_parts, classroom_occupancy=classroom_occupancy,
+        form_data=form_data or {}, field_errors=field_errors or {},
+    ), status
+
+
 @main.route("/admin/cursos/importar", methods=["GET", "POST"])
 @roles_required("admin")
 def admin_import_course_enrollments():
@@ -133,8 +196,15 @@ def admin_create_course():
         )
         flash("Curso creado y asignaciones guardadas.", "success")
     except (ValueError, TypeError) as error:
-        flash(str(error) or "El docente seleccionado no es válido.", "error")
-    return redirect(url_for("main.admin_dashboard"))
+        message = str(error) or "El docente seleccionado no es válido."
+        form_data = request.form.to_dict()
+        form_data["schedule_days"] = request.form.getlist("schedule_days")
+        form_data["student_ids"] = request.form.getlist("student_ids")
+        flash(message, "error")
+        return _render_admin_courses(
+            form_data, {_course_error_field(message): message}, status=400
+        )
+    return redirect(url_for("main.admin_courses"))
 
 
 @main.post("/admin/cursos/<int:course_id>/asignaciones")
@@ -163,47 +233,7 @@ def admin_update_course(course_id):
 @main.get("/admin/cursos")
 @roles_required("admin")
 def admin_courses():
-    query = request.args.get("q", "").strip().casefold()
-    teacher_id = request.args.get("docente", type=int)
-    courses = CourseService().list_all()
-    if query:
-        courses = [
-            course for course in courses
-            if query in course.name.casefold() or query in course.code.casefold()
-        ]
-    if teacher_id:
-        courses = [course for course in courses if course.teacher_id == teacher_id]
-    user_service = UserService()
-    teachers = user_service.list_by_role("docente")
-    students = user_service.list_by_role("alumno")
-    schedule_parts = {
-        course.id: parse_schedule(course.schedule) for course in courses
-    }
-    classroom_occupancy = []
-    for course in CourseService().list_all():
-        parsed = parse_schedule(course.schedule)
-        if (
-            parsed
-            and course.is_active
-            and course.location_type == "presencial"
-            and course.classroom in CLASSROOMS
-        ):
-            classroom_occupancy.append(
-                {
-                    "course_id": course.id,
-                    "course_code": course.code,
-                    "classroom": course.classroom,
-                    "days": [day for day in WEEKDAYS if day in parsed["days"]],
-                    "start": parsed["start"],
-                    "end": parsed["end"],
-                }
-            )
-    return render_template(
-        "admin/admin_courses.html", courses=courses, teachers=teachers,
-        students=students, query=query, selected_teacher=teacher_id,
-        classrooms=CLASSROOMS, weekdays=WEEKDAYS,
-        schedule_parts=schedule_parts, classroom_occupancy=classroom_occupancy,
-    )
+    return _render_admin_courses()
 
 
 @main.post("/admin/cursos/<int:course_id>/estado")
