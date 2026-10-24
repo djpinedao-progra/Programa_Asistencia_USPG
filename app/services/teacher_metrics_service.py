@@ -6,7 +6,10 @@ from app.repositories import (
     NoticeRepository,
     UserRepository,
 )
-from app.services.attendance_calculation_service import attendance_percentage
+from app.services.attendance_calculation_service import (
+    attendance_percentage,
+    exam_eligibility,
+)
 
 
 def teacher_course_metrics(course):
@@ -32,6 +35,7 @@ def teacher_course_metrics(course):
         justified = status_counts.get("justificado", 0)
         absent = max(0, len(sessions) - present - justified)
         percentage = attendance_percentage(present, justified, len(sessions))
+        exam = exam_eligibility(absent)
         students.append(
             {
                 "student": student,
@@ -40,6 +44,9 @@ def teacher_course_metrics(course):
                 "justified": justified,
                 "percentage": percentage,
                 "has_sessions": bool(sessions),
+                "exam_eligible": exam["eligible"],
+                "absences_remaining": exam["absences_remaining"],
+                "exam_risk": exam["risk"],
             }
         )
     slots = len(sessions) * len(students)
@@ -52,8 +59,8 @@ def teacher_course_metrics(course):
         "student_count": len(students),
         "sessions_count": len(sessions),
         "average_percentage": attendance_percentage(attended_slots, 0, slots),
-        "below_80": sum(
-            student["has_sessions"] and student["percentage"] < 80
+        "exam_ineligible": sum(
+            student["has_sessions"] and not student["exam_eligible"]
             for student in students
         ),
         "present_count": sum(student["present"] for student in students),
@@ -70,15 +77,20 @@ def create_low_attendance_notices(course, actor_id):
     existing_ids = set(notice_repository.list_automatic_student_ids(course.id))
     notices = []
     for row in metrics["students"]:
-        if row["percentage"] < 90 and row["student"].id not in existing_ids:
+        if row["exam_risk"] != "ninguno" and row["student"].id not in existing_ids:
+            situation = (
+                "Ya no tienes derecho a examen final por acumular tres faltas."
+                if not row["exam_eligible"]
+                else "Te queda una falta antes de perder el derecho a examen final."
+            )
             notices.append(
                 Notice(
                     course_id=course.id,
                     student_id=row["student"].id,
                     sender_id=actor_id,
                     message=(
-                        f"Tu asistencia en {course.name} es de {row['percentage']}%. "
-                        "El mínimo para examen final es 80%."
+                        f"Llevas {row['absent']} faltas en {course.name}. "
+                        f"{situation}"
                     ),
                     kind="automatic",
                 )

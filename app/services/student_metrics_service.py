@@ -4,7 +4,10 @@ from app.repositories import (
     CourseEnrollmentRepository,
     NoticeRepository,
 )
-from app.services.attendance_calculation_service import attendance_percentage
+from app.services.attendance_calculation_service import (
+    attendance_percentage,
+    exam_eligibility,
+)
 
 
 def student_dashboard_data(student_id, page_number=1):
@@ -66,6 +69,7 @@ def student_dashboard_data(student_id, page_number=1):
             course["justified_count"],
             course["total_sessions"],
         )
+        course.update(exam_eligibility(course["absence_count"]))
     total_sessions = sum(course["total_sessions"] for course in courses)
     total_attended = sum(course["attended_count"] for course in courses)
     total_justified = sum(course["justified_count"] for course in courses)
@@ -75,7 +79,7 @@ def student_dashboard_data(student_id, page_number=1):
     notices = [
         course
         for course in courses
-        if course["total_sessions"] and course["percentage"] < 90
+        if course["total_sessions"] and course["risk"] != "ninguno"
     ]
     received_notices = NoticeRepository().list_for_student_courses(
         course_ids, student_id, limit=20
@@ -95,4 +99,10 @@ def student_dashboard_data(student_id, page_number=1):
         "overall_percentage": overall_percentage,
         "notices": notices,
         "received_notices": received_notices,
+        "exam_lost_courses": [course for course in courses if not course["eligible"]],
+        "exam_warning_courses": [
+            course
+            for course in courses
+            if course["eligible"] and course["risk"] == "medio"
+        ],
     }

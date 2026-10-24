@@ -7,7 +7,10 @@ import pytest
 from app import db
 from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, User
 from app.services.attendance_service import AttendanceService
-from app.services.attendance_calculation_service import attendance_percentage
+from app.services.attendance_calculation_service import (
+    attendance_percentage,
+    exam_eligibility,
+)
 from app.services.expo_service import ExpoService
 from app.services.metrics_service import admin_student_summaries
 from app.services.student_metrics_service import student_dashboard_data
@@ -24,6 +27,24 @@ def test_attendance_percentage_counts_justified_absences(
     present, justified, sessions, expected
 ):
     assert attendance_percentage(present, justified, sessions) == expected
+
+
+@pytest.mark.parametrize(
+    ("absences", "eligible", "remaining", "risk"),
+    [
+        (2, True, 1, "medio"),
+        (3, False, 0, "alto"),
+    ],
+)
+def test_exam_eligibility_uses_three_unjustified_absences(
+    absences, eligible, remaining, risk
+):
+    result = exam_eligibility(absences)
+    assert result == {
+        "eligible": eligible,
+        "absences_remaining": remaining,
+        "risk": risk,
+    }
 
 
 def test_course_without_sessions_has_no_risk_or_misleading_percentage(

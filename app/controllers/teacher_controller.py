@@ -23,7 +23,9 @@ def teacher_dashboard():
         notice_history=notices,
         total_enrollments=sum(course["student_count"] for course in course_metrics),
         total_sessions=sum(course["sessions_count"] for course in course_metrics),
-        students_below_80=sum(course["below_80"] for course in course_metrics),
+        students_without_exam=sum(
+            course["exam_ineligible"] for course in course_metrics
+        ),
     )
 
 

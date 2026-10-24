@@ -29,12 +29,12 @@
     <div class="attendance-summary">
       {% if not total_sessions %}
       <div class="student-alert"><strong>Sin sesiones registradas</strong><p>Todavía no hay información suficiente para calcular asistencia o riesgo.</p></div>
-      {% elif overall_percentage < 80 %}
-      <div class="student-alert alert-risk"><strong>Riesgo de perder derecho a examen final</strong><p>Tu asistencia está por debajo del mínimo requerido de 80%. Contacta a tus docentes para revisar tu situación.</p></div>
-      {% elif overall_percentage < 90 and total_sessions %}
-      <div class="student-alert alert-warning"><strong>Tu asistencia necesita atención</strong><p>El mínimo requerido para tener derecho a examen final es 80%. Procura asistir a las próximas clases.</p></div>
+      {% elif exam_lost_courses %}
+      <div class="student-alert alert-risk"><strong>Sin derecho a examen final</strong><p>Acumulaste tres o más faltas en al menos un curso. Revisa el detalle y contacta a tu docente.</p></div>
+      {% elif exam_warning_courses %}
+      <div class="student-alert alert-warning"><strong>Te queda una falta</strong><p>En al menos un curso llevas dos faltas; la tercera elimina el derecho a examen final.</p></div>
       {% else %}
-      <div class="student-alert alert-good"><strong>Vas por buen camino</strong><p>El mínimo requerido para tener derecho a examen final es 80%. Mantén tu asistencia al día.</p></div>
+      <div class="student-alert alert-good"><strong>Vas por buen camino</strong><p>Con tres faltas injustificadas se pierde el derecho a examen final.</p></div>
       {% endif %}
       <p class="muted student-data-note">El cálculo considera las sesiones QR creadas en los cursos donde ya registraste asistencia.</p>
     </div>
@@ -53,9 +53,10 @@
   <div class="student-course-grid">
   {% for course in courses %}
     <article class="student-course"{% if course.total_sessions %} data-course-progress="{{ course.percentage }}"{% endif %}>
-      <div class="student-course-top"><div><p class="eyebrow">{{ course.course.code }}</p><h3>{{ course.course.name }}</h3><span>Docente: {{ course.course.teacher.name }}</span></div>{% if course.total_sessions %}<strong class="course-rate {% if course.percentage < 80 %}rate-risk{% elif course.percentage < 90 %}rate-warning{% endif %}">{{ course.percentage }}%</strong>{% else %}<strong class="course-rate">Sin sesiones</strong>{% endif %}</div>
+      <div class="student-course-top"><div><p class="eyebrow">{{ course.course.code }}</p><h3>{{ course.course.name }}</h3><span>Docente: {{ course.course.teacher.name }}</span></div>{% if course.total_sessions %}<strong class="course-rate {% if not course.eligible %}rate-risk{% elif course.risk == 'medio' %}rate-warning{% endif %}">{{ course.percentage }}%</strong>{% else %}<strong class="course-rate">Sin sesiones</strong>{% endif %}</div>
       {% if course.total_sessions %}<div class="course-progress-track" role="img" aria-label="{{ course.percentage }} por ciento de asistencia"><span style="width: {{ course.percentage }}%"></span></div>{% endif %}
       <div class="course-stats"><span><strong>{{ course.attended_count }}</strong> asistencias</span><span><strong>{{ course.absence_count }}</strong> faltas</span><span><strong>{{ course.justified_count }}</strong> justificadas</span><span>{{ course.total_sessions }} sesiones</span></div>
+      {% if course.total_sessions %}<p>{% if course.eligible %}Te quedan {{ course.absences_remaining }} faltas antes de perder el derecho a examen final.{% else %}Ya no tienes derecho a examen final por acumular tres faltas.{% endif %}</p>{% endif %}
       <details class="course-attendance-detail"><summary>Ver asistencias del curso</summary>
         {% if course.attendance_records %}<ul>{% for attendance in course.attendance_records %}<li><span>{{ attendance.status|capitalize }} · {{ {'qr': 'Código QR', 'manual': 'Docente', 'cierre': 'Cierre'}[attendance.source] }}</span><time datetime="{{ (attendance.recorded_at|localtime).isoformat() }}">{{ (attendance.recorded_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></li>{% endfor %}</ul>{% else %}<p>No hay registros de asistencia.</p>{% endif %}
       </details>
@@ -68,11 +69,11 @@
 
 <section class="student-section" id="avisos">
   <div class="section-heading"><div><p class="eyebrow">ATENCIÓN ACADÉMICA</p><h2>Avisos</h2></div><span class="section-number">{{ notices|length }} activos</span></div>
-  <div class="notice-minimum"><strong>80% es el mínimo requerido</strong><span>Debajo de ese porcentaje podrías perder el derecho a examen final.</span></div>
+  <div class="notice-minimum"><strong>Tres faltas eliminan el derecho a examen final</strong><span>Las faltas justificadas cuentan como asistencia válida y no suman a este límite.</span></div>
   {% if received_notices %}<div class="received-notices"><h3>Avisos de tus docentes</h3>{% for notice in received_notices %}<article class="notice-item"><span class="notice-mark" aria-hidden="true">i</span><div><strong>{{ notice.course.name }} · {{ notice.course.code }}</strong><p>{{ notice.message }}</p><time>{{ (notice.created_at|localtime).strftime('%d/%m/%Y · %H:%M') }}</time></div></article>{% endfor %}</div>{% endif %}
   {% if notices %}<div class="notice-list">{% for course in notices %}
-    <article class="notice-item {% if course.percentage < 80 %}notice-item-risk{% endif %}" data-notice-course="{{ course.course.code }}"><span class="notice-mark" aria-hidden="true">!</span><div><strong>{{ course.course.name }} · {{ course.course.code }}</strong><p>Tu asistencia es de {{ course.percentage }}%, por debajo del aviso preventivo de 90%. Tienes {{ course.absence_count }} faltas en {{ course.total_sessions }} sesiones.</p>{% if course.percentage < 80 %}<b>Riesgo: estás por debajo del mínimo de 80% para examen final.</b>{% endif %}</div></article>
-  {% endfor %}</div>{% else %}<p class="empty-student">No tienes avisos de asistencia baja. Los cursos con menos de 90% aparecerán aquí.</p>{% endif %}
+    <article class="notice-item {% if not course.eligible %}notice-item-risk{% endif %}" data-notice-course="{{ course.course.code }}"><span class="notice-mark" aria-hidden="true">!</span><div><strong>{{ course.course.name }} · {{ course.course.code }}</strong><p>Llevas {{ course.absence_count }} faltas en {{ course.total_sessions }} sesiones.</p>{% if course.eligible %}<b>Te queda {{ course.absences_remaining }} falta antes de perder el derecho a examen final.</b>{% else %}<b>Ya no tienes derecho a examen final.</b>{% endif %}</div></article>
+  {% endfor %}</div>{% else %}<p class="empty-student">No tienes avisos por faltas. Los cursos con dos o más faltas aparecerán aquí.</p>{% endif %}
   <p class="muted student-data-note">Tus cursos registrados: {% if courses %}{% for course in courses %}{{ course.course.name }} ({{ course.course.code }}){% if not loop.last %}, {% endif %}{% endfor %}{% else %}ninguno todavía{% endif %}.</p>
 </section>
 

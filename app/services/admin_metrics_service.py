@@ -4,7 +4,10 @@ from app.repositories import (
     UserRepository,
 )
 from app.utils.time_utils import local_date_utc_bounds
-from app.services.attendance_calculation_service import attendance_percentage
+from app.services.attendance_calculation_service import (
+    attendance_percentage,
+    exam_eligibility,
+)
 
 
 def admin_dashboard_data(timezone_name="America/Guatemala"):
@@ -204,9 +207,8 @@ def admin_student_summaries(course_id=None, session_date=None, timezone_name="Am
         )
         absent = max(0, total - present - justified)
         percentage = attendance_percentage(present, justified, total)
-        risk = "alto" if total and percentage < 60 else (
-            "medio" if total and percentage < 80 else "ninguno"
-        )
+        exam = exam_eligibility(absent)
+        risk = exam["risk"] if total else "ninguno"
         assigned_courses = [
             course_by_id[item]
             for item in sorted(student_course_ids)
@@ -223,6 +225,8 @@ def admin_student_summaries(course_id=None, session_date=None, timezone_name="Am
                 "total_sessions": total,
                 "percentage": percentage,
                 "risk": risk,
+                "exam_eligible": exam["eligible"],
+                "absences_remaining": exam["absences_remaining"],
             }
         )
     return summaries
