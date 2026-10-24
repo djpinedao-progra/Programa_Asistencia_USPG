@@ -99,8 +99,12 @@ class CourseService:
     ):
         name, code = name.strip(), code.strip().upper()
         schedule, classroom = schedule.strip(), classroom.strip()
-        if not name or not code or not schedule:
-            raise ValueError("Completa el nombre, código y horario del curso.")
+        if not name:
+            raise ValueError("El nombre del curso es obligatorio.")
+        if not code:
+            raise ValueError("El código del curso es obligatorio.")
+        if not schedule:
+            raise ValueError("El horario del curso es obligatorio.")
         teacher = self.users.find_by_id(teacher_id)
         if not teacher or teacher.role != "docente":
             raise ValueError("Selecciona un docente válido para el curso.")
@@ -304,6 +308,14 @@ class CourseService:
         if not course:
             raise ValueError("No se encontró el curso.")
         previous_active = course.is_active
+        if is_active and not previous_active:
+            self._validate_schedule_and_classroom(
+                course.schedule,
+                course.location_type,
+                course.classroom,
+                course.teacher_id,
+                excluded_course_id=course.id,
+            )
         course.is_active = bool(is_active)
         if not course.is_active:
             now = datetime.now(timezone.utc)

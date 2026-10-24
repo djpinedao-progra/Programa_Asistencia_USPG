@@ -255,6 +255,27 @@ def test_admin_rejects_overlapping_teacher_schedule_on_create_and_update(
         course = db.session.get(Course, course_id)
         assert course.schedule.endswith("08:30–09:30")
 
+    disabled_overlap = client.post(
+        f"/admin/cursos/{course_id}/asignaciones",
+        data={
+            **base_data,
+            "name": "Curso contiguo",
+            "code": "DOC-C",
+            "start_time": "08:15",
+            "end_time": "09:30",
+            "classroom": "Salón 2",
+        },
+    )
+    assert disabled_overlap.status_code == 302
+    reactivation = client.post(
+        f"/admin/cursos/{course_id}/estado",
+        data={"csrf_token": token, "is_active": "on"},
+        follow_redirects=True,
+    )
+    assert "El docente ya imparte DOC-A" in reactivation.text
+    with app.app_context():
+        assert db.session.get(Course, course_id).is_active is False
+
 
 def test_create_course_validation_preserves_submitted_values(
     app, sample_data, login_as, csrf_token
@@ -286,6 +307,24 @@ def test_create_course_validation_preserves_submitted_values(
     assert 'value="Viernes" checked' in response.text
     assert "Ese código de curso ya está registrado" in response.text
     assert 'class="field-error" role="alert"' in response.text
+
+    invalid_teacher = client.post(
+        "/admin/cursos",
+        data={
+            "csrf_token": csrf_token(client),
+            "name": "Otro curso conservado",
+            "code": "KEEP-2",
+            "teacher_id": "",
+            "schedule_days": ["Viernes"],
+            "start_time": "14:00",
+            "end_time": "16:00",
+            "location_type": "virtual",
+            "classroom": "",
+        },
+    )
+    assert invalid_teacher.status_code == 400
+    assert 'value="Otro curso conservado"' in invalid_teacher.text
+    assert "Selecciona un docente válido para el curso" in invalid_teacher.text
 
 
 @pytest.mark.parametrize(

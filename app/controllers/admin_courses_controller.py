@@ -24,6 +24,13 @@ def _schedule_from_form():
     )
 
 
+def _teacher_id_from_form():
+    try:
+        return int(request.form.get("teacher_id", ""))
+    except (TypeError, ValueError) as error:
+        raise ValueError("Selecciona un docente válido para el curso.") from error
+
+
 def _course_error_field(message):
     field_rules = (
         ("código", "code"),
@@ -185,7 +192,7 @@ def admin_course_import_template():
 @roles_required("admin")
 def admin_create_course():
     try:
-        teacher_id = int(request.form.get("teacher_id", ""))
+        teacher_id = _teacher_id_from_form()
         CourseService().create_course_for_admin(
             request.form.get("name", ""),
             request.form.get("code", ""),
@@ -213,7 +220,7 @@ def admin_create_course():
 @roles_required("admin")
 def admin_update_course(course_id):
     try:
-        teacher_id = int(request.form.get("teacher_id", ""))
+        teacher_id = _teacher_id_from_form()
         CourseService().update_course_roster(
             course_id,
             teacher_id,
