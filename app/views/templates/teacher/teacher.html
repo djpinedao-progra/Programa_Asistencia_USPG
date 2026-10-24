@@ -11,7 +11,7 @@
   <div class="section-heading"><div><p class="eyebrow">PLANIFICACIÓN</p><h2>Mis cursos</h2></div><span class="section-number">{{ courses|length }} asignados</span></div>
   <div class="teacher-course-grid">
   {% for item in course_metrics %}{% set course = item.course %}
-    <article class="teacher-course-card"><div class="teacher-course-title"><div><p class="eyebrow">{{ course.code }}</p><h3>{{ course.name }}</h3></div><strong>{{ item.average_percentage }}%</strong></div>
+    <article class="teacher-course-card"><div class="teacher-course-title"><div><p class="eyebrow">{{ course.code }}</p><h3>{{ course.name }}</h3></div><strong>{{ item.average_percentage ~ '%' if item.sessions_count else 'Sin sesiones' }}</strong></div>
       <div class="teacher-course-facts"><span><b>{{ item.student_count }}</b> estudiantes</span><span><b>{{ item.sessions_count }}</b> sesiones</span><span><b>{{ item.exam_ineligible }}</b> sin derecho a examen</span></div>
       <div class="teacher-course-meta"><span><b>Horario</b>{{ course.schedule or 'Pendiente de asignar' }}</span><span><b>Modalidad</b>{{ 'Virtual' if course.location_type == 'virtual' else 'Presencial' }} · {{ course.classroom or 'Salón pendiente' }}</span></div>
       <a class="button button-outline button-small" href="{{ url_for('main.teacher_course', course_id=course.id) }}">Ver Curso <span aria-hidden="true">→</span></a>

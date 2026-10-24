@@ -34,7 +34,7 @@ def build_admin_report_pdf(summaries, title, subtitle):
         Paragraph(escape(subtitle), styles["BodyText"]),
         Spacer(1, 9 * mm),
     ]
-    chart_rows = summaries[:14]
+    chart_rows = [row for row in summaries if row["total_sessions"]][:14]
     if chart_rows:
         chart_height = max(70, len(chart_rows) * 18 + 10)
         chart = Drawing(520, chart_height)
@@ -84,8 +84,8 @@ def build_admin_report_pdf(summaries, title, subtitle):
                 str(row["present"]),
                 str(row["absent"]),
                 str(row["justified"]),
-                f"{row['percentage']}%",
-                row["risk"].capitalize(),
+                _percentage_label(row),
+                row["risk"].capitalize() if row["total_sessions"] else "Sin sesiones",
             ]
         )
     table = Table(
@@ -112,6 +112,10 @@ def build_admin_report_pdf(summaries, title, subtitle):
     story.append(table)
     document.build(story)
     return output.getvalue()
+
+
+def _percentage_label(row):
+    return f"{row['percentage']}%" if row["total_sessions"] else "Sin sesiones"
 
 
 def build_session_report_pdf(title, subtitle, rows):
