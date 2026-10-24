@@ -4,6 +4,7 @@ from app.repositories import (
     CourseEnrollmentRepository,
     NoticeRepository,
 )
+from app.services.attendance_calculation_service import attendance_percentage
 
 
 def student_dashboard_data(student_id, page_number=1):
@@ -60,14 +61,17 @@ def student_dashboard_data(student_id, page_number=1):
             progress["attendance_records"].append(attendance)
     courses = sorted(course_progress.values(), key=lambda item: item["course"].name)
     for course in courses:
-        course["percentage"] = (
-            round(course["attended_count"] / course["total_sessions"] * 100)
-            if course["total_sessions"]
-            else 0
+        course["percentage"] = attendance_percentage(
+            course["attended_count"],
+            course["justified_count"],
+            course["total_sessions"],
         )
     total_sessions = sum(course["total_sessions"] for course in courses)
     total_attended = sum(course["attended_count"] for course in courses)
-    overall_percentage = round(total_attended / total_sessions * 100) if total_sessions else 0
+    total_justified = sum(course["justified_count"] for course in courses)
+    overall_percentage = attendance_percentage(
+        total_attended, total_justified, total_sessions
+    )
     notices = [course for course in courses if course["percentage"] < 90]
     received_notices = NoticeRepository().list_for_student_courses(
         course_ids, student_id, limit=20
@@ -82,6 +86,7 @@ def student_dashboard_data(student_id, page_number=1):
         "courses": courses,
         "total_sessions": total_sessions,
         "total_attended": total_attended,
+        "total_justified": total_justified,
         "total_absences": sum(course["absence_count"] for course in courses),
         "overall_percentage": overall_percentage,
         "notices": notices,

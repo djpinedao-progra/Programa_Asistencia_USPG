@@ -7,8 +7,22 @@ import pytest
 from app import db
 from app.models import Attendance, AttendanceSession, User
 from app.services.attendance_service import AttendanceService
+from app.services.attendance_calculation_service import attendance_percentage
 from app.services.expo_service import ExpoService
 from app.services.metrics_service import admin_student_summaries
+
+
+@pytest.mark.parametrize(
+    ("present", "justified", "sessions", "expected"),
+    [
+        (3, 1, 12, 33.33),
+        (0, 2, 4, 50),
+    ],
+)
+def test_attendance_percentage_counts_justified_absences(
+    present, justified, sessions, expected
+):
+    assert attendance_percentage(present, justified, sessions) == expected
 
 
 def test_metrics_calculate_percentage_and_risk_levels(app, sample_data):

@@ -6,6 +6,7 @@ from app.repositories import (
     NoticeRepository,
     UserRepository,
 )
+from app.services.attendance_calculation_service import attendance_percentage
 
 
 def teacher_course_metrics(course):
@@ -30,7 +31,7 @@ def teacher_course_metrics(course):
         present = status_counts.get("presente", 0)
         justified = status_counts.get("justificado", 0)
         absent = max(0, len(sessions) - present - justified)
-        percentage = round(present / len(sessions) * 100) if sessions else 0
+        percentage = attendance_percentage(present, justified, len(sessions))
         students.append(
             {
                 "student": student,
@@ -41,13 +42,15 @@ def teacher_course_metrics(course):
             }
         )
     slots = len(sessions) * len(students)
-    present_slots = sum(student["present"] for student in students)
+    attended_slots = sum(
+        student["present"] + student["justified"] for student in students
+    )
     return {
         "course": course,
         "students": students,
         "student_count": len(students),
         "sessions_count": len(sessions),
-        "average_percentage": round(present_slots / slots * 100) if slots else 0,
+        "average_percentage": attendance_percentage(attended_slots, 0, slots),
         "below_80": sum(student["percentage"] < 80 for student in students),
         "present_count": sum(student["present"] for student in students),
         "absence_count": sum(student["absent"] for student in students),

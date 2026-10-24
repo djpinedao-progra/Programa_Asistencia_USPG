@@ -4,6 +4,7 @@ from app.repositories import (
     UserRepository,
 )
 from app.utils.time_utils import local_date_utc_bounds
+from app.services.attendance_calculation_service import attendance_percentage
 
 
 def admin_dashboard_data(timezone_name="America/Guatemala"):
@@ -202,7 +203,7 @@ def admin_student_summaries(course_id=None, session_date=None, timezone_name="Am
             for student_course_id in student_course_ids
         )
         absent = max(0, total - present - justified)
-        percentage = round(present / total * 100) if total else 0
+        percentage = attendance_percentage(present, justified, total)
         risk = "alto" if total and percentage < 60 else (
             "medio" if total and percentage < 80 else "ninguno"
         )
