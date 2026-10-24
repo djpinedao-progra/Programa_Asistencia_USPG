@@ -18,7 +18,8 @@
   {% if current_user.is_authenticated %}
   {% if current_user.is_authenticated %}
   <aside class="institution-sidebar">
-    <a class="sidebar-brand" href="{{ url_for('main.admin_dashboard') }}"><img src="{{ url_for('static', filename='img/uspg-official.png') }}" alt="Universidad San Pablo Guatemala"></a>
+    {% set role_home = {'admin': 'main.admin_dashboard', 'docente': 'main.teacher_dashboard', 'alumno': 'main.student_dashboard'}[current_user.role] %}
+    <a class="sidebar-brand" href="{{ url_for(role_home) }}"><img src="{{ url_for('static', filename='img/uspg-official.png') }}" alt="Universidad San Pablo Guatemala"></a>
     <p class="sidebar-caption">CONTROL DE ASISTENCIA</p>
     <nav class="admin-nav" aria-label="Navegación principal">
 {% if current_user.role == 'admin' %}{% include "partials/sidebar_admin_links.html" %}
