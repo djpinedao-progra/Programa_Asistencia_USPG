@@ -8,7 +8,6 @@ from app.services.metrics_service import (
     admin_attendance_overview_data,
     admin_dashboard_data,
     admin_history_data,
-    admin_session_summaries,
     admin_student_summaries,
 )
 

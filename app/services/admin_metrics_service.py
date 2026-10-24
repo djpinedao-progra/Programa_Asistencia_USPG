@@ -3,11 +3,11 @@ from app.repositories import (
     CourseRepository,
     UserRepository,
 )
-from app.utils.time_utils import local_date_utc_bounds
 from app.services.attendance_calculation_service import (
     attendance_percentage,
     exam_eligibility,
 )
+from app.utils.time_utils import local_date_utc_bounds
 
 
 def admin_dashboard_data(timezone_name="America/Guatemala"):

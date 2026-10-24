@@ -5,7 +5,7 @@ from xml.sax.saxutils import escape
 from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
     Paragraph,

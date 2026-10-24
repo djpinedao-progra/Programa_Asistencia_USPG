@@ -1,7 +1,7 @@
 from app.models import Notice
 from app.repositories import (
-    AttendanceRepository,
     AttendanceMetricsRepository,
+    AttendanceRepository,
     CourseEnrollmentRepository,
     NoticeRepository,
     UserRepository,
@@ -13,7 +13,6 @@ from app.services.attendance_calculation_service import (
 
 
 def teacher_course_metrics(course):
-    attendance_repository = AttendanceRepository()
     metrics_repository = AttendanceMetricsRepository()
     sessions = metrics_repository.list_closed_sessions_for_course(course.id)
     roster = CourseEnrollmentRepository().list_students_for_course(course.id)

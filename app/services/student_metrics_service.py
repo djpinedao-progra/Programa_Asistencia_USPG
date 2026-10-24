@@ -1,4 +1,3 @@
-from app.models import AttendanceSession, Course, Notice
 from app.repositories import (
     AttendanceRepository,
     CourseEnrollmentRepository,

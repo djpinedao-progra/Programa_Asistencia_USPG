@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
 import re
 import unicodedata
+from datetime import datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
 
@@ -8,7 +8,6 @@ from app.models import Attendance, Course, CourseEnrollment
 from app.repositories import AttendanceRepository, CourseRepository, UserRepository
 from app.services.audit_service import AuditService
 from app.services.course_enrollment_service import CourseEnrollmentService
-
 
 CLASSROOMS = tuple(f"Salón {number}" for number in range(1, 26))
 WEEKDAYS = (

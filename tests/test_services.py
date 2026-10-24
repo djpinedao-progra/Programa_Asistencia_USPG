@@ -1,16 +1,16 @@
-from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app import db
 from app.models import Attendance, AttendanceSession, Course, CourseEnrollment, User
-from app.services.attendance_service import AttendanceService
 from app.services.attendance_calculation_service import (
     attendance_percentage,
     exam_eligibility,
 )
+from app.services.attendance_service import AttendanceService
 from app.services.expo_service import ExpoService
 from app.services.metrics_service import admin_student_summaries
 from app.services.student_metrics_service import student_dashboard_data
