@@ -338,6 +338,7 @@ class GoogleClassroomService:
         location_type,
         classroom,
         actor_id,
+        teacher_email="",
     ):
         preview = self.course_preview(classroom_course_id)
         owner = next(
@@ -350,6 +351,15 @@ class GoogleClassroomService:
         )
         if owner is None:
             raise ValueError("El curso no tiene un catedrático visible para importar.")
+        owner = dict(owner)
+        provided_teacher_email = teacher_email.strip().lower()
+        if provided_teacher_email:
+            owner["email"] = provided_teacher_email
+        if not owner.get("email", "").strip():
+            raise ValueError(
+                "Google no compartió el correo del catedrático. "
+                "Ingresa su correo institucional para importar el curso."
+            )
         issues = []
         created_without_carnet = 0
         try:

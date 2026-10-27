@@ -312,6 +312,50 @@ def test_imports_course_teacher_and_valid_students_without_duplicates(app, sampl
         assert len(db.session.scalars(select(GoogleIdentity)).all()) == 3
 
 
+def test_import_accepts_manual_teacher_email_when_google_hides_it(app, sample_data):
+    _enable_google(app)
+    preview = {
+        "id": "course-with-hidden-teacher-email",
+        "name": "Curso con correo docente oculto",
+        "section": "Sección A",
+        "room": "",
+        "owner_id": "teacher-hidden",
+        "alternate_link": "https://classroom.google.com/",
+        "teachers": [
+            {
+                "google_user_id": "teacher-hidden",
+                "name": "Docente Visible",
+                "email": "",
+            }
+        ],
+        "students": [
+            {
+                "google_user_id": "student-visible",
+                "name": "Alumno Visible",
+                "email": "visible@alumno.uspg.edu.gt",
+            }
+        ],
+        "teacher_count": 1,
+        "student_count": 1,
+    }
+    with app.app_context():
+        service = GoogleClassroomService(sample_data["admin_id"])
+        service.course_preview = lambda _course_id: preview
+
+        result = service.import_course(
+            preview["id"],
+            "HIDDEN-101",
+            build_schedule(["Martes"], "10:00", "11:00"),
+            "virtual",
+            "",
+            sample_data["admin_id"],
+            teacher_email="visible@catedratico.uspg.edu.gt",
+        )
+
+        assert result["course"].teacher.email == "visible@catedratico.uspg.edu.gt"
+        assert result["students_imported"] == 1
+
+
 def test_admin_can_preview_google_course_with_mocked_api(
     app, sample_data, login_as, monkeypatch
 ):
@@ -324,6 +368,7 @@ def test_admin_can_preview_google_course_with_mocked_api(
             "name": COURSE_DATA["name"],
             "section": COURSE_DATA["section"],
             "room": "",
+            "owner_id": COURSE_DATA["ownerId"],
             "alternate_link": COURSE_DATA["alternateLink"],
             "teachers": [GoogleClassroomService._profile(TEACHERS[0])],
             "students": [GoogleClassroomService._profile(STUDENTS[0])],
@@ -339,6 +384,8 @@ def test_admin_can_preview_google_course_with_mocked_api(
     assert response.status_code == 200
     assert "Valores Progresistas" in response.text
     assert "Classroom no proporciona un horario semanal" in response.text
+    assert 'name="teacher_email"' in response.text
+    assert 'value="classroom@catedratico.uspg.edu.gt"' in response.text
 
 
 def test_google_callback_rejects_invalid_state(app, sample_data, login_as):

@@ -35,6 +35,8 @@
   <form method="post" action="{{ url_for('main.admin_google_course_import', classroom_course_id=course.id) }}" class="admin-course-form" data-course-schedule-form data-course-id="">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label>Código identificador<input name="code" value="{{ suggested_code }}" maxlength="30" required></label>
+    {% set primary_teacher = course.teachers | selectattr('google_user_id', 'equalto', course.owner_id) | first or course.teachers | first %}
+    <label>Correo institucional del catedrático<input name="teacher_email" type="email" value="{{ primary_teacher.email if primary_teacher else '' }}" placeholder="nombre@catedratico.uspg.edu.gt" required><small>Google puede ocultar este correo. Confirma el correo institucional antes de importar.</small></label>
     <label>Modalidad<select name="location_type" required data-location-type><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></label>
     <fieldset class="course-schedule-fields"><legend>Días de clase</legend><div class="course-day-picker">{% for day in weekdays %}<label><input type="checkbox" name="schedule_days" value="{{ day }}">{{ day }}</label>{% endfor %}</div></fieldset>
     <label>Hora de inicio<input type="time" name="start_time" required></label>

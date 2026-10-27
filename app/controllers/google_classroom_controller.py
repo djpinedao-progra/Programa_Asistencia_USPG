@@ -134,6 +134,7 @@ def admin_google_course_import(classroom_course_id):
             request.form.get("location_type", ""),
             request.form.get("classroom", ""),
             current_user.id,
+            teacher_email=request.form.get("teacher_email", ""),
         )
     except ValueError as error:
         flash(str(error), "error")
