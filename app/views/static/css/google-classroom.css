@@ -1,0 +1,19 @@
+.classroom-setup-warning { border-left: 4px solid var(--brand-red); }
+.classroom-connect-panel { display: grid; gap: 14px; justify-items: start; }
+.classroom-connect-panel h2, .classroom-connect-panel p { margin: 0; }
+.classroom-connection { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+.classroom-connection h2 { margin: 3px 0 5px; font-size: 20px; }
+.classroom-course-list h2, .classroom-preview-grid h2 { margin-top: 0; }
+.classroom-course-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 0; border-top: 1px solid var(--line); }
+.classroom-course-card h3, .classroom-course-card p { margin: 2px 0; }
+.classroom-course-actions { display: flex; align-items: center; gap: 10px; }
+.classroom-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px; margin-bottom: 18px; }
+.classroom-facts { display: grid; gap: 8px; }
+.classroom-facts div { display: grid; grid-template-columns: minmax(120px, .8fr) 1.2fr; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.classroom-facts dt { color: var(--muted); font-size: 11px; font-weight: 700; }
+.classroom-facts dd { margin: 0; overflow-wrap: anywhere; font-size: 12px; }
+
+@media (max-width: 700px) {
+  .classroom-connection, .classroom-course-card { align-items: stretch; flex-direction: column; }
+  .classroom-preview-grid { grid-template-columns: 1fr; }
+}

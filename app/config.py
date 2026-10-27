@@ -7,14 +7,13 @@ def load_config(test_config=None):
     env_secret = os.getenv("SECRET_KEY")
     database_url = os.getenv("DATABASE_URL", "sqlite:///luis_independiente.db")
     if database_url.startswith("postgres://"):
-        database_url = database_url.replace(
-            "postgres://", "postgresql+psycopg://", 1
-        )
+        database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
     elif database_url.startswith("postgresql://"):
-        database_url = database_url.replace(
-            "postgresql://", "postgresql+psycopg://", 1
-        )
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
+    app_base_url = os.getenv(
+        "APP_BASE_URL", os.getenv("RENDER_EXTERNAL_URL", "")
+    ).rstrip("/")
     config = {
         "SECRET_KEY": env_secret or secrets.token_urlsafe(48),
         "SQLALCHEMY_DATABASE_URI": database_url,
@@ -26,11 +25,20 @@ def load_config(test_config=None):
         "ATTENDANCE_CLOSE_GRACE_MINUTES": int(
             os.getenv("ATTENDANCE_CLOSE_GRACE_MINUTES", "30")
         ),
-        "APP_BASE_URL": os.getenv(
-            "APP_BASE_URL", os.getenv("RENDER_EXTERNAL_URL", "")
-        ).rstrip("/"),
+        "APP_BASE_URL": app_base_url,
         "APP_TIMEZONE": os.getenv("APP_TIMEZONE", "America/Guatemala"),
         "APP_ENV": app_env,
+        "GOOGLE_CLASSROOM_ENABLED": os.getenv("GOOGLE_CLASSROOM_ENABLED", "false")
+        .strip()
+        .lower()
+        in {"1", "true", "yes", "si", "sÃ­"},
+        "GOOGLE_CLIENT_ID": os.getenv("GOOGLE_CLIENT_ID", "").strip(),
+        "GOOGLE_CLIENT_SECRET": os.getenv("GOOGLE_CLIENT_SECRET", "").strip(),
+        "GOOGLE_REDIRECT_URI": os.getenv(
+            "GOOGLE_REDIRECT_URI",
+            f"{app_base_url}/admin/google/callback" if app_base_url else "",
+        ).strip(),
+        "GOOGLE_TOKEN_ENCRYPTION_KEY": os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY", ""),
     }
     if test_config:
         config.update(test_config)

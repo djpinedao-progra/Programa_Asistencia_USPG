@@ -8,6 +8,7 @@ import pytest
         ("css/layout.css", "text/css"),
         ("css/components.css", "text/css"),
         ("css/screens.css", "text/css"),
+        ("css/google-classroom.css", "text/css"),
         ("js/attendance-course.js", "text/javascript"),
         ("js/password-feedback.js", "text/javascript"),
         ("js/live-session.js", "text/javascript"),

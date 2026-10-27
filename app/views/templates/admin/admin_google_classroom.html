@@ -1,0 +1,54 @@
+{% extends "layout/base.html" %}
+{% block title %}Google Classroom Â· AdministraciÃ³n{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">INTEGRACIÃ“N ACADÃ‰MICA</p>
+    <h1>Google Classroom</h1>
+    <p class="muted">Importa cursos y participantes con permisos de solo lectura.</p>
+  </div>
+</div>
+
+{% if configuration_errors %}
+<section class="admin-data-section classroom-setup-warning">
+  <h2>ConfiguraciÃ³n pendiente</h2>
+  <p>El entorno de pruebas todavÃ­a necesita estas variables:</p>
+  <ul>{% for item in configuration_errors %}<li><code>{{ item }}</code></li>{% endfor %}</ul>
+</section>
+{% elif not connection %}
+<section class="admin-data-section classroom-connect-panel">
+  <h2>Conectar cuenta institucional</h2>
+  <p>Google solicitarÃ¡ autorizaciÃ³n para leer cursos, listas y correos. El sistema no podrÃ¡ modificar Classroom.</p>
+  <a class="button button-primary" href="{{ url_for('main.admin_google_connect') }}">Conectar con Google Classroom</a>
+</section>
+{% else %}
+<section class="admin-data-section classroom-connection">
+  <div>
+    <p class="eyebrow">CUENTA CONECTADA</p>
+    <h2>{{ connection.google_email }}</h2>
+    <p class="muted">Selecciona un curso activo para revisar sus datos antes de importarlo.</p>
+  </div>
+  <form method="post" action="{{ url_for('main.admin_google_disconnect') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="button button-outline button-small" type="submit">Desconectar</button>
+  </form>
+</section>
+
+<section class="admin-data-section classroom-course-list">
+  <h2>Cursos disponibles</h2>
+  {% for course in courses %}
+  <article class="classroom-course-card">
+    <div>
+      <p class="eyebrow">{{ course.section or 'SIN SECCIÃ“N' }}</p>
+      <h3>{{ course.name }}</h3>
+      <p>{{ course.room or 'Sin salÃ³n en Classroom' }}</p>
+    </div>
+    <div class="classroom-course-actions">
+      {% if course.already_imported %}<span class="teacher-status status-good">Sincronizado</span>{% endif %}
+      <a class="button button-outline button-small" href="{{ url_for('main.admin_google_course_preview', classroom_course_id=course.id) }}">Revisar</a>
+    </div>
+  </article>
+  {% else %}<p class="empty-cell">La cuenta conectada no tiene cursos activos disponibles.</p>{% endfor %}
+</section>
+{% endif %}
+{% endblock %}

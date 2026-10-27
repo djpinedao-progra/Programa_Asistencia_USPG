@@ -61,6 +61,23 @@ Google Fonts necesita internet; sin conexión usa fuente del sistema.
 Pruebas: python -m pytest -q.
 Pruebas de navegador: Playwright con Chromium.
 
+## IntegraciÃ³n opcional con Google Classroom
+
+La integraciÃ³n se mantiene oculta por defecto. Al establecer
+`GOOGLE_CLASSROOM_ENABLED=true`, el administrador puede conectar una cuenta de
+Google mediante OAuth e importar cursos activos, docentes y alumnos. Classroom
+no proporciona un horario semanal estructurado, salÃ³n normalizado ni carnet;
+estos datos se confirman antes de importar.
+
+Permisos solicitados: cursos, matrÃ­culas y correos en modo de solo lectura. Los
+tokens OAuth se cifran antes de guardarse. Configura `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET` y `GOOGLE_TOKEN_ENCRYPTION_KEY` como secretos del
+entorno. `GOOGLE_REDIRECT_URI` puede omitirse en Render porque se deriva de
+`RENDER_EXTERNAL_URL`; localmente debe apuntar a `/admin/google/callback`.
+
+`render.staging.yaml` define un servicio y una base PostgreSQL independientes
+para probar la rama `codex/google-classroom-integration` sin tocar producciÃ³n.
+
 Motor original: https://github.com/djpinedao-progra/Programa_Asistencia_USPG
 
 ## Despliegue temporal gratuito en Render

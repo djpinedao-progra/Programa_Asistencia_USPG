@@ -1,0 +1,44 @@
+# Entorno aislado para probar Google Classroom sin modificar producciÃ³n.
+services:
+  - type: web
+    name: programa-asistencia-uspg-classroom-pruebas
+    runtime: python
+    plan: free
+    region: virginia
+    branch: codex/google-classroom-integration
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements.txt
+    startCommand: python prepare_production.py && gunicorn run:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 60
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: programa-asistencia-uspg-classroom-pruebas-db
+          property: connectionString
+      - key: APP_TIMEZONE
+        value: America/Guatemala
+      - key: ATTENDANCE_CLOSE_GRACE_MINUTES
+        value: 30
+      - key: GOOGLE_CLASSROOM_ENABLED
+        value: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+databases:
+  - name: programa-asistencia-uspg-classroom-pruebas-db
+    plan: free
+    region: virginia
+    databaseName: asistencia_uspg_classroom_pruebas
+    user: uspg_classroom_pruebas
+    ipAllowList: []

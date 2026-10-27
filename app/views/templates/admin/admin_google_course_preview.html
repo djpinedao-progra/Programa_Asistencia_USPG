@@ -1,0 +1,47 @@
+{% extends "layout/base.html" %}
+{% block title %}Importar {{ course.name }} Â· Google Classroom{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">VISTA PREVIA DE CLASSROOM</p>
+    <h1>{{ course.name }}</h1>
+    <p class="muted">{{ course.section or 'Sin secciÃ³n' }} Â· {{ course.teacher_count }} docentes Â· {{ course.student_count }} alumnos</p>
+  </div>
+  <a class="button button-outline button-small" href="{{ url_for('main.admin_google_classroom') }}">Volver a cursos</a>
+</div>
+
+<section class="admin-data-section classroom-preview-grid">
+  <div>
+    <h2>Datos detectados</h2>
+    <dl class="classroom-facts">
+      <div><dt>ID de Classroom</dt><dd>{{ course.id }}</dd></div>
+      <div><dt>SecciÃ³n</dt><dd>{{ course.section or 'No indicada' }}</dd></div>
+      <div><dt>SalÃ³n informado</dt><dd>{{ course.room or 'No indicado' }}</dd></div>
+      <div><dt>Docentes</dt><dd>{{ course.teacher_count }}</dd></div>
+      <div><dt>Alumnos</dt><dd>{{ course.student_count }}</dd></div>
+    </dl>
+    {% if course.alternate_link %}<a class="text-link" href="{{ course.alternate_link }}" target="_blank" rel="noopener">Abrir en Google Classroom</a>{% endif %}
+  </div>
+  <div>
+    <h2>Participantes</h2>
+    <p><strong>CatedrÃ¡ticos:</strong> {% for teacher in course.teachers %}{{ teacher.name }}{% if not loop.last %}, {% endif %}{% else %}No visibles{% endfor %}</p>
+    <p><strong>Alumnos reconocidos:</strong> {{ course.student_count }}</p>
+    <p class="muted">Los alumnos sin correo institucional compatible se omitirÃ¡n y quedarÃ¡n registrados como incidencias.</p>
+  </div>
+</section>
+
+<section class="admin-data-section">
+  <h2>Completar datos acadÃ©micos</h2>
+  <form method="post" action="{{ url_for('main.admin_google_course_import', classroom_course_id=course.id) }}" class="admin-course-form" data-course-schedule-form data-course-id="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>CÃ³digo identificador<input name="code" value="{{ suggested_code }}" maxlength="30" required></label>
+    <label>Modalidad<select name="location_type" required data-location-type><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></label>
+    <fieldset class="course-schedule-fields"><legend>DÃ­as de clase</legend><div class="course-day-picker">{% for day in weekdays %}<label><input type="checkbox" name="schedule_days" value="{{ day }}">{{ day }}</label>{% endfor %}</div></fieldset>
+    <label>Hora de inicio<input type="time" name="start_time" required></label>
+    <label>Hora de finalizaciÃ³n<input type="time" name="end_time" required></label>
+    <label>SalÃ³n<select name="classroom" required data-classroom-select><option value="">Selecciona un salÃ³n</option>{% for classroom in classrooms %}<option value="{{ classroom }}">{{ classroom }}</option>{% endfor %}</select><small class="room-availability" data-room-status>Classroom no proporciona un horario semanal estructurado.</small></label>
+    <button class="button button-primary" type="submit">Importar y sincronizar curso</button>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/classroom-schedule.js', v='20261026-google') }}" defer></script>{% endblock %}
