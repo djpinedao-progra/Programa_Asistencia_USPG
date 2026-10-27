@@ -112,14 +112,23 @@ class GoogleClassroomService:
         try:
             flow.fetch_token(code=code)
             credentials = flow.credentials
+        except (GoogleAuthError, OAuth2Error) as error:
+            raise ValueError(
+                "Google no pudo completar la autorizaciÃ³n. Intenta conectar de nuevo."
+            ) from error
+        profile = {}
+        try:
             api = build(
                 "classroom", "v1", credentials=credentials, cache_discovery=False
             )
             profile = api.userProfiles().get(userId="me").execute()
-        except (GoogleAuthError, HttpError, OAuth2Error) as error:
-            raise ValueError(
-                "Google no pudo completar la autorizaciÃ³n. Intenta conectar de nuevo."
-            ) from error
+        except HttpError as error:
+            status = getattr(error.resp, "status", "desconocido")
+            current_app.logger.warning(
+                "Google autorizo la cuenta, pero no devolvio el perfil de Classroom "
+                "(HTTP %s). La conexion continuara sin correo visible.",
+                status,
+            )
         self._save_credentials(credentials, profile.get("emailAddress", ""))
         return profile
 

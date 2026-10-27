@@ -25,7 +25,7 @@
 <section class="admin-data-section classroom-connection">
   <div>
     <p class="eyebrow">CUENTA CONECTADA</p>
-    <h2>{{ connection.google_email }}</h2>
+    <h2>{{ connection.google_email or 'Cuenta institucional de Google' }}</h2>
     <p class="muted">Selecciona un curso activo para revisar sus datos antes de importarlo.</p>
   </div>
   <form method="post" action="{{ url_for('main.admin_google_disconnect') }}">

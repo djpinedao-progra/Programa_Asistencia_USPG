@@ -1,6 +1,8 @@
 from datetime import UTC, datetime, timedelta
+from unittest.mock import Mock
 
 from google.oauth2.credentials import Credentials
+from googleapiclient.errors import HttpError
 from sqlalchemy import select
 
 from app import db
@@ -149,6 +151,66 @@ def test_google_classroom_credentials_are_encrypted_at_rest(app, sample_data):
         connection = service._save_credentials(credentials, "admin@uspg.edu.gt")
 
         assert "access-token" not in connection.encrypted_credentials
+        assert service._credentials().token == "access-token"
+
+
+def test_google_profile_failure_does_not_block_oauth_connection(
+    app, sample_data, monkeypatch
+):
+    _enable_google(app)
+    credentials = Credentials(
+        token="access-token",
+        refresh_token="refresh-token",
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id="client-id",
+        client_secret="client-secret",
+        scopes=["scope-a"],
+        expiry=datetime.now(UTC) + timedelta(hours=1),
+    )
+
+    class FakeFlow:
+        redirect_uri = ""
+
+        def fetch_token(self, code):
+            assert code == "authorization-code"
+
+        @property
+        def credentials(self):
+            return credentials
+
+    class ProfileRequest:
+        def execute(self):
+            response = Mock(status=403, reason="Forbidden")
+            raise HttpError(response, b'{"error":{"message":"Forbidden"}}')
+
+    class ProfilesResource:
+        def get(self, userId):
+            assert userId == "me"
+            return ProfileRequest()
+
+    class ProfileApi:
+        def userProfiles(self):
+            return ProfilesResource()
+
+    monkeypatch.setattr(
+        "app.services.google_classroom_service.Flow.from_client_config",
+        lambda *_args, **_kwargs: FakeFlow(),
+    )
+    monkeypatch.setattr(
+        "app.services.google_classroom_service.build",
+        lambda *_args, **_kwargs: ProfileApi(),
+    )
+
+    with app.app_context():
+        service = GoogleClassroomService(sample_data["admin_id"])
+        profile = service.save_authorization_code(
+            "authorization-code", "expected-state"
+        )
+
+        connection = db.session.scalar(select(GoogleOAuthConnection))
+        assert profile == {}
+        assert connection is not None
+        assert connection.google_email == ""
         assert service._credentials().token == "access-token"
 
 
