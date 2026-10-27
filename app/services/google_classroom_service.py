@@ -101,14 +101,15 @@ class GoogleClassroomService:
             include_granted_scopes="true",
             prompt="consent",
         )
-        return authorization_url, state
+        return authorization_url, state, flow.code_verifier
 
-    def save_authorization_code(self, code, state):
+    def save_authorization_code(self, code, state, code_verifier):
         self.require_available()
         flow = Flow.from_client_config(
             self._client_config(), scopes=CLASSROOM_SCOPES, state=state
         )
         flow.redirect_uri = current_app.config["GOOGLE_REDIRECT_URI"]
+        flow.code_verifier = code_verifier
         try:
             flow.fetch_token(code=code)
             credentials = flow.credentials

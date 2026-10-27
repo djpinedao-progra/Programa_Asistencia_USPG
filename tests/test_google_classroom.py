@@ -204,7 +204,7 @@ def test_google_profile_failure_does_not_block_oauth_connection(
     with app.app_context():
         service = GoogleClassroomService(sample_data["admin_id"])
         profile = service.save_authorization_code(
-            "authorization-code", "expected-state"
+            "authorization-code", "expected-state", "expected-verifier"
         )
 
         connection = db.session.scalar(select(GoogleOAuthConnection))
@@ -212,6 +212,32 @@ def test_google_profile_failure_does_not_block_oauth_connection(
         assert connection is not None
         assert connection.google_email == ""
         assert service._credentials().token == "access-token"
+
+
+def test_google_oauth_preserves_pkce_verifier(app, sample_data, login_as, monkeypatch):
+    _enable_google(app)
+
+    class FakeFlow:
+        redirect_uri = ""
+        code_verifier = "pkce-verifier"
+
+        def authorization_url(self, **kwargs):
+            assert kwargs["access_type"] == "offline"
+            return "https://accounts.google.com/o/oauth2/auth", "oauth-state"
+
+    monkeypatch.setattr(
+        "app.services.google_classroom_service.Flow.from_client_config",
+        lambda *_args, **_kwargs: FakeFlow(),
+    )
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+
+    response = client.get("/admin/google/connect")
+
+    assert response.status_code == 302
+    with client.session_transaction() as user_session:
+        assert user_session["google_oauth_state"] == "oauth-state"
+        assert user_session["google_oauth_code_verifier"] == "pkce-verifier"
 
 
 def test_imports_course_teacher_and_valid_students_without_duplicates(app, sample_data):
@@ -307,6 +333,7 @@ def test_google_callback_rejects_invalid_state(app, sample_data, login_as):
     login_as(client, sample_data["admin_id"])
     with client.session_transaction() as user_session:
         user_session["google_oauth_state"] = "expected"
+        user_session["google_oauth_code_verifier"] = "expected-verifier"
 
     response = client.get("/admin/google/callback?state=wrong&code=code")
 

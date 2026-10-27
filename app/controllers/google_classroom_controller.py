@@ -44,11 +44,12 @@ def admin_google_classroom():
 def admin_google_connect():
     service = _service()
     try:
-        authorization_url, state = service.authorization_url()
+        authorization_url, state, code_verifier = service.authorization_url()
     except GoogleClassroomConfigurationError as error:
         flash(str(error), "error")
         return redirect(url_for("main.admin_google_classroom"))
     session["google_oauth_state"] = state
+    session["google_oauth_code_verifier"] = code_verifier
     return redirect(authorization_url)
 
 
@@ -57,9 +58,11 @@ def admin_google_connect():
 def admin_google_callback():
     service = _service()
     expected_state = session.pop("google_oauth_state", "")
+    code_verifier = session.pop("google_oauth_code_verifier", "")
     received_state = request.args.get("state", "")
     if (
         not expected_state
+        or not code_verifier
         or not received_state
         or not hmac.compare_digest(expected_state, received_state)
     ):
@@ -76,7 +79,7 @@ def admin_google_callback():
     if not code:
         abort(400, description="Google no enviÃ³ el cÃ³digo de autorizaciÃ³n.")
     try:
-        profile = service.save_authorization_code(code, received_state)
+        profile = service.save_authorization_code(code, received_state, code_verifier)
     except (ValueError, GoogleClassroomConfigurationError) as error:
         flash(str(error), "error")
     else:
