@@ -135,6 +135,20 @@ def test_google_classroom_page_reports_missing_environment_variables(
     assert b"GOOGLE_TOKEN_ENCRYPTION_KEY" in response.data
 
 
+def test_google_classroom_page_renders_spanish_text_as_utf8(app, sample_data, login_as):
+    _enable_google(app)
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+
+    response = client.get("/admin/google")
+
+    assert response.status_code == 200
+    assert "INTEGRACIÓN ACADÉMICA" in response.text
+    assert "autorización" in response.text
+    assert "Ã" not in response.text
+    assert "Â" not in response.text
+
+
 def test_google_classroom_credentials_are_encrypted_at_rest(app, sample_data):
     _enable_google(app)
     credentials = Credentials(

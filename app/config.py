@@ -34,7 +34,7 @@ def load_config(test_config=None):
         "GOOGLE_CLASSROOM_ENABLED": os.getenv("GOOGLE_CLASSROOM_ENABLED", "false")
         .strip()
         .lower()
-        in {"1", "true", "yes", "si", "sÃ­"},
+        in {"1", "true", "yes", "si", "sí"},
         "GOOGLE_CLIENT_ID": os.getenv("GOOGLE_CLIENT_ID", "").strip(),
         "GOOGLE_CLIENT_SECRET": os.getenv("GOOGLE_CLIENT_SECRET", "").strip(),
         "GOOGLE_REDIRECT_URI": os.getenv(

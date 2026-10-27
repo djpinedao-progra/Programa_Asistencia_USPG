@@ -62,7 +62,7 @@ class GoogleClassroomService:
     def require_available(cls):
         if not cls.enabled():
             raise GoogleClassroomConfigurationError(
-                "La integraciÃ³n con Google Classroom estÃ¡ desactivada."
+                "La integración con Google Classroom está desactivada."
             )
         missing = cls.configuration_errors()
         if missing:
@@ -115,7 +115,7 @@ class GoogleClassroomService:
             credentials = flow.credentials
         except (GoogleAuthError, OAuth2Error) as error:
             raise ValueError(
-                "Google no pudo completar la autorizaciÃ³n. Intenta conectar de nuevo."
+                "Google no pudo completar la autorización. Intenta conectar de nuevo."
             ) from error
         profile = {}
         try:
@@ -178,11 +178,11 @@ class GoogleClassroomService:
                 credentials.refresh(GoogleAuthRequest())
             except GoogleAuthError as error:
                 raise ValueError(
-                    "Google revocÃ³ o venciÃ³ la autorizaciÃ³n. Vuelve a conectar."
+                    "Google revocó o venció la autorización. Vuelve a conectar."
                 ) from error
             self._save_credentials(credentials, connection.google_email)
         if not credentials.valid:
-            raise ValueError("La autorizaciÃ³n de Google venciÃ³. Vuelve a conectar.")
+            raise ValueError("La autorización de Google venció. Vuelve a conectar.")
         return credentials
 
     def api(self):
@@ -221,7 +221,7 @@ class GoogleClassroomService:
             status = getattr(error.resp, "status", None)
             if status in {401, 403}:
                 raise ValueError(
-                    "Google no autorizÃ³ la consulta. Verifica la cuenta y los permisos."
+                    "Google no autorizó la consulta. Verifica la cuenta y los permisos."
                 ) from error
             raise ValueError(
                 "Google Classroom no pudo completar la consulta."
@@ -271,7 +271,7 @@ class GoogleClassroomService:
                     "La cuenta conectada no puede consultar ese curso."
                 ) from error
             if status == 404:
-                raise ValueError("Google Classroom no encontrÃ³ ese curso.") from error
+                raise ValueError("Google Classroom no encontró ese curso.") from error
             raise ValueError(
                 "No se pudo consultar el curso en Google Classroom."
             ) from error
@@ -296,7 +296,7 @@ class GoogleClassroomService:
         email = profile.get("email", "").strip().lower()
         name = profile.get("name", "").strip()
         if not google_user_id or not email or not name:
-            raise ValueError("Google no proporcionÃ³ nombre y correo completos.")
+            raise ValueError("Google no proporcionó nombre y correo completos.")
         identity = db.session.scalar(
             select(GoogleIdentity).where(
                 GoogleIdentity.google_user_id == google_user_id
@@ -305,7 +305,7 @@ class GoogleClassroomService:
         if identity:
             if identity.user.role != role:
                 raise ValueError(
-                    f"{email} ya estÃ¡ vinculado con el rol {identity.user.role}."
+                    f"{email} ya está vinculado con el rol {identity.user.role}."
                 )
             identity.email = email
             identity.synced_at = datetime.now(UTC)
@@ -349,7 +349,7 @@ class GoogleClassroomService:
             preview["teachers"][0] if preview["teachers"] else None,
         )
         if owner is None:
-            raise ValueError("El curso no tiene un catedrÃ¡tico visible para importar.")
+            raise ValueError("El curso no tiene un catedrático visible para importar.")
         issues = []
         created_without_carnet = 0
         try:
@@ -371,7 +371,7 @@ class GoogleClassroomService:
                     issues.append(str(error))
             if not students:
                 raise ValueError(
-                    "No se pudo reconocer ningÃºn alumno con correo institucional vÃ¡lido."
+                    "No se pudo reconocer ningún alumno con correo institucional válido."
                 )
             link = db.session.scalar(
                 select(GoogleClassroomCourseLink).where(

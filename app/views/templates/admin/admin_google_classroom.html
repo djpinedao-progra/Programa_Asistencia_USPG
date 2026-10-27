@@ -1,9 +1,9 @@
 {% extends "layout/base.html" %}
-{% block title %}Google Classroom Â· AdministraciÃ³n{% endblock %}
+{% block title %}Google Classroom · Administración{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
-    <p class="eyebrow">INTEGRACIÃ“N ACADÃ‰MICA</p>
+    <p class="eyebrow">INTEGRACIÓN ACADÉMICA</p>
     <h1>Google Classroom</h1>
     <p class="muted">Importa cursos y participantes con permisos de solo lectura.</p>
   </div>
@@ -11,14 +11,14 @@
 
 {% if configuration_errors %}
 <section class="admin-data-section classroom-setup-warning">
-  <h2>ConfiguraciÃ³n pendiente</h2>
-  <p>El entorno de pruebas todavÃ­a necesita estas variables:</p>
+  <h2>Configuración pendiente</h2>
+  <p>El entorno de pruebas todavía necesita estas variables:</p>
   <ul>{% for item in configuration_errors %}<li><code>{{ item }}</code></li>{% endfor %}</ul>
 </section>
 {% elif not connection %}
 <section class="admin-data-section classroom-connect-panel">
   <h2>Conectar cuenta institucional</h2>
-  <p>Google solicitarÃ¡ autorizaciÃ³n para leer cursos, listas y correos. El sistema no podrÃ¡ modificar Classroom.</p>
+  <p>Google solicitará autorización para leer cursos, listas y correos. El sistema no podrá modificar Classroom.</p>
   <a class="button button-primary" href="{{ url_for('main.admin_google_connect') }}">Conectar con Google Classroom</a>
 </section>
 {% else %}
@@ -39,9 +39,9 @@
   {% for course in courses %}
   <article class="classroom-course-card">
     <div>
-      <p class="eyebrow">{{ course.section or 'SIN SECCIÃ“N' }}</p>
+      <p class="eyebrow">{{ course.section or 'SIN SECCIÓN' }}</p>
       <h3>{{ course.name }}</h3>
-      <p>{{ course.room or 'Sin salÃ³n en Classroom' }}</p>
+      <p>{{ course.room or 'Sin salón en Classroom' }}</p>
     </div>
     <div class="classroom-course-actions">
       {% if course.already_imported %}<span class="teacher-status status-good">Sincronizado</span>{% endif %}

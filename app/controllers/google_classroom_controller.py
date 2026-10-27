@@ -69,15 +69,15 @@ def admin_google_callback():
         abort(
             400,
             description=(
-                "La respuesta de Google no superÃ³ la validaciÃ³n de seguridad."
+                "La respuesta de Google no superó la validación de seguridad."
             ),
         )
     if request.args.get("error"):
-        flash("Google no autorizÃ³ la conexiÃ³n.", "error")
+        flash("Google no autorizó la conexión.", "error")
         return redirect(url_for("main.admin_google_classroom"))
     code = request.args.get("code", "")
     if not code:
-        abort(400, description="Google no enviÃ³ el cÃ³digo de autorizaciÃ³n.")
+        abort(400, description="Google no envió el código de autorización.")
     try:
         profile = service.save_authorization_code(code, received_state, code_verifier)
     except (ValueError, GoogleClassroomConfigurationError) as error:
@@ -95,7 +95,7 @@ def admin_google_disconnect():
     if service.disconnect():
         flash("La cuenta de Google Classroom fue desconectada.", "success")
     else:
-        flash("No habÃ­a una cuenta de Google conectada.", "error")
+        flash("No había una cuenta de Google conectada.", "error")
     return redirect(url_for("main.admin_google_classroom"))
 
 
