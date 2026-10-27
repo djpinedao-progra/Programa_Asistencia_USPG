@@ -1,5 +1,8 @@
 import os
+import re
 import secrets
+
+_POSTGRES_SCHEMA_PATTERN = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 def load_config(test_config=None):
@@ -39,9 +42,22 @@ def load_config(test_config=None):
             f"{app_base_url}/admin/google/callback" if app_base_url else "",
         ).strip(),
         "GOOGLE_TOKEN_ENCRYPTION_KEY": os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY", ""),
+        "DB_SCHEMA": os.getenv("DB_SCHEMA", "").strip(),
     }
     if test_config:
         config.update(test_config)
+    db_schema = str(config.get("DB_SCHEMA", "")).strip()
+    if db_schema:
+        if not _POSTGRES_SCHEMA_PATTERN.fullmatch(db_schema):
+            raise RuntimeError(
+                "DB_SCHEMA debe usar solo letras minúsculas, números y guiones bajos."
+            )
+        if not str(config["SQLALCHEMY_DATABASE_URI"]).startswith("postgresql"):
+            raise RuntimeError("DB_SCHEMA solamente es compatible con PostgreSQL.")
+        config["DB_SCHEMA"] = db_schema
+        config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "connect_args": {"options": f"-csearch_path={db_schema}"}
+        }
     if config.get("APP_ENV") == "production":
         config["SESSION_COOKIE_SECURE"] = True
     if (

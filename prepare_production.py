@@ -1,6 +1,9 @@
 """Initialize an external database without creating demo accounts."""
+
 import os
 from pathlib import Path
+
+from sqlalchemy import text
 
 from app import db
 from app.models import User
@@ -10,6 +13,10 @@ from app.services import UserService
 def prepare_database(application):
     """Create the schema and the first admin; safe to run on every boot."""
     with application.app_context():
+        schema = application.config.get("DB_SCHEMA", "")
+        if schema:
+            with db.engine.begin() as connection:
+                connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
         db.create_all()
         reset_demo = os.getenv("RESET_DEMO_DATA", "").strip().lower() in {
             "1",
@@ -77,9 +84,7 @@ def prepare_database(application):
         email = os.getenv("ADMIN_EMAIL", "").strip().lower()
         password = os.getenv("ADMIN_PASSWORD", "")
         if not email or not password:
-            raise RuntimeError(
-                "Configura ADMIN_EMAIL y ADMIN_PASSWORD en Render."
-            )
+            raise RuntimeError("Configura ADMIN_EMAIL y ADMIN_PASSWORD en Render.")
         UserService().create_user("Administrador", email, password, "admin")
         print("Cuenta administradora creada. No se crearon usuarios demo.")
         return True

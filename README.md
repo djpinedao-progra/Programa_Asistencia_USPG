@@ -75,8 +75,13 @@ tokens OAuth se cifran antes de guardarse. Configura `GOOGLE_CLIENT_ID`,
 entorno. `GOOGLE_REDIRECT_URI` puede omitirse en Render porque se deriva de
 `RENDER_EXTERNAL_URL`; localmente debe apuntar a `/admin/google/callback`.
 
-`render.staging.yaml` define un servicio y una base PostgreSQL independientes
+`render.staging.yaml` define un servicio independiente
 para probar la rama `codex/google-classroom-integration` sin tocar producciÃ³n.
+
+Para evitar el costo de una segunda base PostgreSQL, reutiliza la instancia
+existente con `DB_SCHEMA=classroom_pruebas`; las tablas de prueba quedan en ese
+esquema y no modifican las tablas de producción. `DATABASE_URL` se copia como
+secreto desde el servicio principal.
 
 Motor original: https://github.com/djpinedao-progra/Programa_Asistencia_USPG
 
