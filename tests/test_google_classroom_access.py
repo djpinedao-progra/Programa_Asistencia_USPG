@@ -1,5 +1,3 @@
-from app import db
-from app.models import User
 from app.services import UserService
 
 
@@ -16,16 +14,14 @@ def _enable_google(app):
 def test_test_user_can_open_only_google_classroom_area(app, sample_data, login_as):
     _enable_google(app)
     with app.app_context():
-        tester = User(
-            name="Analista de pruebas",
-            email="analista@alumno.uspg.edu.gt",
+        tester = UserService().create_user(
+            "Analista de pruebas",
+            "analista@alumno.uspg.edu.gt",
+            "Password123!",
+            "alumno",
             carnet="9900001",
-            role="alumno",
             google_classroom_access=True,
         )
-        tester.set_password("Password123!")
-        db.session.add(tester)
-        db.session.commit()
         tester_id = tester.id
 
     client = app.test_client()

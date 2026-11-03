@@ -63,7 +63,16 @@ class UserService:
     def find_by_login_identifier(self, identifier):
         return self.users.find_by_login_identifier(identifier)
 
-    def create_user(self, name, email, password, role, carnet="", actor_id=None):
+    def create_user(
+        self,
+        name,
+        email,
+        password,
+        role,
+        carnet="",
+        actor_id=None,
+        google_classroom_access=False,
+    ):
         name, email = name.strip(), email.strip().lower()
         carnet = carnet.strip()
         if not name or "@" not in email:
@@ -78,7 +87,13 @@ class UserService:
             raise ValueError("Ya existe una cuenta con ese correo.")
         if carnet and self.users.find_by_carnet(carnet):
             raise ValueError("Ya existe una cuenta con ese carnet.")
-        user = User(name=name, email=email, carnet=carnet or None, role=role)
+        user = User(
+            name=name,
+            email=email,
+            carnet=carnet or None,
+            role=role,
+            google_classroom_access=google_classroom_access,
+        )
         user.set_password(password)
         try:
             self.users.stage(user)

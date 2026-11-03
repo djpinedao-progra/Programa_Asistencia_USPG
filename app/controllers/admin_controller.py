@@ -24,6 +24,9 @@ def admin_dashboard():
                 request.form.get("role", ""),
                 request.form.get("carnet", ""),
                 actor_id=current_user.id,
+                google_classroom_access=(
+                    request.form.get("google_classroom_access") == "on"
+                ),
             )
             flash("Usuario creado correctamente.", "success")
             return redirect(url_for("main.admin_dashboard"))
