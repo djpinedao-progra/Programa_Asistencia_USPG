@@ -173,6 +173,23 @@ class UserService:
             self.users.rollback()
             raise ValueError("El correo o carnet ya pertenece a otra cuenta.") from error
 
+    def update_google_classroom_access(self, user_id, enabled, actor_id=None):
+        """Activa o quita el acceso limitado de una cuenta académica."""
+        user = self.users.find_by_id(user_id)
+        if not user or user.role not in {"alumno", "docente"}:
+            raise ValueError("No se encontró la cuenta académica.")
+        enabled = bool(enabled)
+        if user.google_classroom_access != enabled:
+            user.google_classroom_access = enabled
+            AuditService.record(
+                actor_id,
+                "google_classroom_access_updated",
+                "user",
+                user.id,
+                {"enabled": enabled},
+            )
+        return self.users.save(user)
+
     def change_password(self, user_id, current_password, new_password, confirmation):
         user = self.users.find_by_id(user_id)
         if not user or not user.check_password(current_password):

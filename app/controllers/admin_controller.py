@@ -100,14 +100,23 @@ def admin_user_profile(user_id):
         abort(404)
     if request.method == "POST":
         try:
-            UserService().update_profile(
-                user.id,
-                request.form.get("name", ""),
-                request.form.get("email", ""),
-                request.form.get("carnet", ""),
-                actor_id=current_user.id,
-            )
-            flash("Perfil actualizado.", "success")
+            user_service = UserService()
+            if request.form.get("google_classroom_access_update"):
+                user_service.update_google_classroom_access(
+                    user.id,
+                    request.form.get("google_classroom_access") == "on",
+                    actor_id=current_user.id,
+                )
+                flash("Acceso de Google Classroom actualizado.", "success")
+            else:
+                user_service.update_profile(
+                    user.id,
+                    request.form.get("name", ""),
+                    request.form.get("email", ""),
+                    request.form.get("carnet", ""),
+                    actor_id=current_user.id,
+                )
+                flash("Perfil actualizado.", "success")
             return redirect(url_for("main.admin_user_profile", user_id=user.id))
         except ValueError as error:
             flash(str(error), "error")
