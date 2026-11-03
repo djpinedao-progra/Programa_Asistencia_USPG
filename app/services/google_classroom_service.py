@@ -26,6 +26,7 @@ from app.services.audit_service import AuditService
 from app.services.course_service import CourseService
 from app.services.user_service import UserService
 
+# Esta lista dice qué información podemos leer en Classroom. No permite modificar Google.
 CLASSROOM_SCOPES = (
     "https://www.googleapis.com/auth/classroom.courses.readonly",
     "https://www.googleapis.com/auth/classroom.rosters.readonly",
@@ -33,21 +34,25 @@ CLASSROOM_SCOPES = (
 )
 
 
+# Este error se usa cuando falta preparar algún dato de la conexión con Google.
 class GoogleClassroomConfigurationError(ValueError):
     pass
 
 
 class GoogleClassroomService:
     def __init__(self, admin_user_id, api=None):
+        # Recordamos qué administrador está usando la integración.
         self.admin_user_id = admin_user_id
         self._api = api
 
     @staticmethod
     def enabled():
+        # Revisa si la integración fue activada en la configuración de la aplicación.
         return bool(current_app.config.get("GOOGLE_CLASSROOM_ENABLED"))
 
     @staticmethod
     def configuration_errors():
+        # Reúne los datos necesarios para conectarse y señala los que faltan.
         required = {
             "GOOGLE_CLIENT_ID": current_app.config.get("GOOGLE_CLIENT_ID"),
             "GOOGLE_CLIENT_SECRET": current_app.config.get("GOOGLE_CLIENT_SECRET"),
@@ -60,6 +65,7 @@ class GoogleClassroomService:
 
     @classmethod
     def require_available(cls):
+        # Antes de usar Google verificamos que la integración esté lista.
         if not cls.enabled():
             raise GoogleClassroomConfigurationError(
                 "La integración con Google Classroom está desactivada."
@@ -72,6 +78,7 @@ class GoogleClassroomService:
 
     @staticmethod
     def _client_config():
+        # Prepara la información que identifica a nuestra aplicación frente a Google.
         return {
             "web": {
                 "client_id": current_app.config["GOOGLE_CLIENT_ID"],
@@ -84,6 +91,7 @@ class GoogleClassroomService:
 
     @staticmethod
     def _cipher():
+        # Crea una herramienta para guardar protegido el permiso recibido de Google.
         secret = current_app.config.get("GOOGLE_TOKEN_ENCRYPTION_KEY", "")
         if not secret:
             raise GoogleClassroomConfigurationError(
@@ -94,6 +102,7 @@ class GoogleClassroomService:
 
     def authorization_url(self):
         self.require_available()
+        # Creamos el viaje hacia Google y pedimos solamente los permisos indicados arriba.
         flow = Flow.from_client_config(self._client_config(), scopes=CLASSROOM_SCOPES)
         flow.redirect_uri = current_app.config["GOOGLE_REDIRECT_URI"]
         authorization_url, state = flow.authorization_url(
@@ -105,12 +114,14 @@ class GoogleClassroomService:
 
     def save_authorization_code(self, code, state, code_verifier):
         self.require_available()
+        # Google devuelve un código de un solo uso después de que el usuario acepta.
         flow = Flow.from_client_config(
             self._client_config(), scopes=CLASSROOM_SCOPES, state=state
         )
         flow.redirect_uri = current_app.config["GOOGLE_REDIRECT_URI"]
         flow.code_verifier = code_verifier
         try:
+            # Cambiamos ese código por el permiso que permite consultar Classroom.
             flow.fetch_token(code=code)
             credentials = flow.credentials
         except (GoogleAuthError, OAuth2Error) as error:
@@ -119,6 +130,7 @@ class GoogleClassroomService:
             ) from error
         profile = {}
         try:
+            # Intentamos leer el perfil para mostrar qué cuenta quedó conectada.
             api = build(
                 "classroom", "v1", credentials=credentials, cache_discovery=False
             )
@@ -130,10 +142,12 @@ class GoogleClassroomService:
                 "(HTTP %s). La conexion continuara sin correo visible.",
                 status,
             )
+        # Guardamos el permiso protegido para no pedir autorización en cada consulta.
         self._save_credentials(credentials, profile.get("emailAddress", ""))
         return profile
 
     def _save_credentials(self, credentials, google_email=""):
+        # Convertimos el permiso en texto protegido antes de guardarlo en la base de datos.
         encrypted = self._cipher().encrypt(credentials.to_json().encode()).decode()
         connection = self.connection()
         if connection is None:
@@ -147,6 +161,7 @@ class GoogleClassroomService:
         return connection
 
     def connection(self):
+        # Busca la conexión de Google que pertenece al administrador actual.
         return db.session.scalar(
             select(GoogleOAuthConnection).where(
                 GoogleOAuthConnection.user_id == self.admin_user_id
@@ -154,6 +169,7 @@ class GoogleClassroomService:
         )
 
     def disconnect(self):
+        # Desconectar significa borrar el permiso guardado en nuestra aplicación.
         connection = self.connection()
         if connection:
             db.session.delete(connection)
@@ -162,6 +178,7 @@ class GoogleClassroomService:
         return False
 
     def _credentials(self):
+        # Recupera el permiso protegido y revisa si todavía se puede usar.
         connection = self.connection()
         if not connection:
             raise ValueError("Conecta primero una cuenta de Google Classroom.")
@@ -173,6 +190,7 @@ class GoogleClassroomService:
                 "Vuelve a conectar la cuenta."
             ) from error
         credentials = Credentials.from_authorized_user_info(json.loads(payload))
+        # Si el permiso venció, Google puede renovarlo sin pedir la contraseña otra vez.
         if credentials.expired and credentials.refresh_token:
             try:
                 credentials.refresh(GoogleAuthRequest())
@@ -186,6 +204,7 @@ class GoogleClassroomService:
         return credentials
 
     def api(self):
+        # Crea una sola conexión reutilizable para consultar Google Classroom.
         if self._api is None:
             self.require_available()
             self._api = build(
@@ -198,6 +217,7 @@ class GoogleClassroomService:
 
     @staticmethod
     def _profile(resource):
+        # Deja los datos de una persona con el mismo formato que usa nuestra aplicación.
         profile = resource.get("profile", {})
         name = profile.get("name", {})
         return {
@@ -207,6 +227,7 @@ class GoogleClassroomService:
         }
 
     def _paged(self, request_builder, result_key, **kwargs):
+        # Google puede entregar los resultados en varias páginas; aquí las reunimos.
         rows = []
         page_token = None
         try:
@@ -228,12 +249,14 @@ class GoogleClassroomService:
             ) from error
 
     def list_courses(self):
+        # Pedimos los cursos activos que puede ver la cuenta autorizada.
         courses = self._paged(
             self.api().courses().list,
             "courses",
             courseStates=["ACTIVE"],
             pageSize=100,
         )
+        # Identificamos los cursos que ya fueron importados para no repetirlos.
         linked_ids = set(
             db.session.scalars(select(GoogleClassroomCourseLink.classroom_course_id))
         )
@@ -251,6 +274,7 @@ class GoogleClassroomService:
 
     def course_preview(self, classroom_course_id):
         try:
+            # Leemos un curso, sus docentes y sus alumnos antes de guardarlo aquí.
             course = self.api().courses().get(id=classroom_course_id).execute()
             teachers = self._paged(
                 self.api().courses().teachers().list,
@@ -275,6 +299,7 @@ class GoogleClassroomService:
             raise ValueError(
                 "No se pudo consultar el curso en Google Classroom."
             ) from error
+        # Ordenamos los datos recibidos para que las pantallas los usen de forma simple.
         normalized_teachers = [self._profile(item) for item in teachers]
         normalized_students = [self._profile(item) for item in students]
         return {
@@ -292,9 +317,11 @@ class GoogleClassroomService:
 
     @staticmethod
     def _upsert_identity(profile, role):
+        # Busca a la persona. Si no existe, la crea; si ya existe, actualiza sus datos.
         google_user_id = profile.get("google_user_id", "").strip()
         email = profile.get("email", "").strip().lower()
         name = profile.get("name", "").strip()
+        # Sin identificador, nombre o correo no podemos relacionar a la persona correctamente.
         if not google_user_id or not email or not name:
             raise ValueError("Google no proporcionó nombre y correo completos.")
         identity = db.session.scalar(
@@ -302,6 +329,7 @@ class GoogleClassroomService:
                 GoogleIdentity.google_user_id == google_user_id
             )
         )
+        # Si Google ya está enlazado a una persona de la aplicación, usamos esa persona.
         if identity:
             if identity.user.role != role:
                 raise ValueError(
@@ -315,6 +343,7 @@ class GoogleClassroomService:
             if user.role != role:
                 raise ValueError(f"{email} ya existe con el rol {user.role}.")
         else:
+            # Creamos una cuenta nueva con una contraseña aleatoria que no se muestra.
             UserService.validate_email_role(email, role)
             user = User(name=name, email=email, role=role)
             user.set_password(secrets.token_urlsafe(32))
@@ -340,7 +369,9 @@ class GoogleClassroomService:
         actor_id,
         teacher_email="",
     ):
+        # Primero volvemos a consultar el curso para trabajar con datos actuales.
         preview = self.course_preview(classroom_course_id)
+        # Elegimos al dueño del curso como catedrático principal.
         owner = next(
             (
                 teacher
@@ -352,6 +383,7 @@ class GoogleClassroomService:
         if owner is None:
             raise ValueError("El curso no tiene un catedrático visible para importar.")
         owner = dict(owner)
+        # El administrador puede completar el correo si Google decidió ocultarlo.
         provided_teacher_email = teacher_email.strip().lower()
         if provided_teacher_email:
             owner["email"] = provided_teacher_email
@@ -360,9 +392,11 @@ class GoogleClassroomService:
                 "Google no compartió el correo del catedrático. "
                 "Ingresa su correo institucional para importar el curso."
             )
+        # Aquí anotamos las personas que no se puedan importar sin detener todo el curso.
         issues = []
         created_without_carnet = 0
         try:
+            # Creamos o actualizamos al docente principal y a los docentes adicionales.
             teacher, _ = self._upsert_identity(owner, "docente")
             for extra_teacher in preview["teachers"]:
                 if extra_teacher["google_user_id"] == owner["google_user_id"]:
@@ -371,6 +405,7 @@ class GoogleClassroomService:
                     self._upsert_identity(extra_teacher, "docente")
                 except ValueError as error:
                     issues.append(str(error))
+            # Creamos o actualizamos a los alumnos que Google compartió.
             students = []
             for profile in preview["students"]:
                 try:
@@ -383,6 +418,7 @@ class GoogleClassroomService:
                 raise ValueError(
                     "No se pudo reconocer ningún alumno con correo institucional válido."
                 )
+            # Revisamos si este curso de Classroom ya había sido importado antes.
             link = db.session.scalar(
                 select(GoogleClassroomCourseLink).where(
                     GoogleClassroomCourseLink.classroom_course_id == classroom_course_id
@@ -390,6 +426,7 @@ class GoogleClassroomService:
             )
             course_service = CourseService()
             if link:
+                # Si ya existe, solo actualizamos sus datos y su lista de alumnos.
                 course = course_service.update_course_roster(
                     link.course_id,
                     teacher.id,
@@ -403,6 +440,7 @@ class GoogleClassroomService:
                     actor_id=actor_id,
                 )
             else:
+                # Si es la primera vez, creamos el curso y guardamos su enlace con Google.
                 course = course_service.create_course_for_admin(
                     preview["name"],
                     code,
@@ -420,6 +458,7 @@ class GoogleClassroomService:
                 db.session.add(link)
             link.alternate_link = preview["alternate_link"]
             link.synced_at = datetime.now(UTC)
+            # Dejamos una nota en el historial para saber quién sincronizó el curso.
             AuditService.record(
                 actor_id,
                 "google_classroom_synced",
@@ -433,6 +472,7 @@ class GoogleClassroomService:
             )
             db.session.commit()
         except Exception:
+            # Si algo falla, deshacemos los cambios incompletos para cuidar los datos.
             db.session.rollback()
             raise
         return {
@@ -445,6 +485,7 @@ class GoogleClassroomService:
 
 
 def suggested_course_code(course):
+    # Propone un código corto usando la sección o el final del identificador de Google.
     section = "".join(
         character
         for character in course.get("section", "").upper()

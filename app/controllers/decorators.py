@@ -16,3 +16,16 @@ def roles_required(*roles):
         return wrapped
 
     return decorator
+
+
+def google_classroom_access_required(view):
+    """Permite usar Classroom a administradores y a usuarios de prueba autorizados."""
+
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if current_user.role != "admin" and not current_user.google_classroom_access:
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped

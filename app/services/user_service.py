@@ -1,4 +1,5 @@
 import re
+from typing import ClassVar
 
 from sqlalchemy.exc import IntegrityError
 
@@ -8,13 +9,15 @@ from app.services.audit_service import AuditService
 
 
 class UserService:
-    ALLOWED_ROLES = {"admin", "docente", "alumno"}
-    EMAIL_ROLES = {
+    ALLOWED_ROLES: ClassVar[set[str]] = {"admin", "docente", "alumno"}
+    EMAIL_ROLES: ClassVar[dict[str, str]] = {
         "alumno.uspg.edu.gt": "alumno",
         "catedratico.uspg.edu.gt": "docente",
         "administrador.uspg.edu.gt": "admin",
         "uspg.edu": "admin",
     }
+    # Un docente puede recibir el rol de administrador solamente si otro administrador crea la cuenta.
+    ELEVATED_ROLE_DOMAINS: ClassVar[set[str]] = {"catedratico.uspg.edu.gt"}
     MIN_PASSWORD_LENGTH = 8
 
     @classmethod
@@ -25,8 +28,17 @@ class UserService:
         return cls.EMAIL_ROLES.get(email.split("@")[1])
 
     @classmethod
+    def role_is_allowed_for_email(cls, email, role):
+        """Comprueba si el correo puede usar el rol indicado en esta aplicación."""
+        email = email.strip().lower()
+        if cls.email_role(email) == role:
+            return True
+        domain = email.rsplit("@", 1)[-1] if "@" in email else ""
+        return role == "admin" and domain in cls.ELEVATED_ROLE_DOMAINS
+
+    @classmethod
     def validate_email_role(cls, email, role):
-        if cls.email_role(email) != role:
+        if not cls.role_is_allowed_for_email(email, role):
             raise ValueError("El dominio del correo universitario no corresponde al rol seleccionado.")
 
     @classmethod

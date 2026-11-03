@@ -97,6 +97,14 @@ def register_commands(app):
         db.create_all()
         click.echo("Tabla de auditoría lista.")
 
+    @app.cli.command("migrate-google-classroom-access")
+    def migrate_google_classroom_access_command():
+        """Add the limited Google Classroom permission to existing users."""
+        from app.database_migrations import ensure_google_classroom_access_column
+
+        ensure_google_classroom_access_column()
+        click.echo("Permiso limitado de Google Classroom listo.")
+
     @app.cli.command("backup-db")
     @click.argument("destination", type=click.Path(path_type=Path, dir_okay=False))
     def backup_db_command(destination):

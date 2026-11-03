@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -15,8 +15,12 @@ class User(UserMixin, db.Model):
     carnet = db.Column(db.String(20), unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, index=True)
+    # Da acceso limitado al módulo de Google Classroom sin convertir al usuario en administrador.
+    google_classroom_access = db.Column(
+        db.Boolean, nullable=False, default=False, server_default=db.text("false")
+    )
     created_at = db.Column(
-        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
     def set_password(self, password):

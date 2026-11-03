@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from app import db
+from app.database_migrations import ensure_google_classroom_access_column
 from app.models import User
 from app.services import UserService
 
@@ -18,6 +19,7 @@ def prepare_database(application):
             with db.engine.begin() as connection:
                 connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
         db.create_all()
+        ensure_google_classroom_access_column()
         reset_demo = os.getenv("RESET_DEMO_DATA", "").strip().lower() in {
             "1",
             "true",

@@ -36,6 +36,7 @@
 <a href="{{ url_for('main.student_dashboard') }}#mis-cursos">Mis cursos</a>
 <a href="{{ url_for('main.student_dashboard') }}#avisos">Avisos</a>
 {% endif %}
+{% if current_user.role != 'admin' and current_user.google_classroom_access and config.GOOGLE_CLASSROOM_ENABLED %}<a href="{{ url_for('main.admin_google_classroom') }}" {% if request.endpoint and request.endpoint.startswith('main.admin_google_') %}aria-current="page"{% endif %}>Google Classroom</a>{% endif %}
 <a href="{{ url_for('main.account_security') }}">Seguridad</a>
 </nav>
     <div class="sidebar-footer">Comunidad USPG<small>Gestión académica</small></div>

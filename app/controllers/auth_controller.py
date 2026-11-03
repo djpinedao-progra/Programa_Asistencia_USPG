@@ -2,7 +2,6 @@ from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.controllers import main
-from app.controllers.decorators import roles_required
 from app.services import ExpoService, UserService
 
 
@@ -15,7 +14,9 @@ def login():
         password = request.form.get("password", "")
         user = UserService().find_by_login_identifier(identifier)
         from app.recovery import authenticate
-        if user and UserService.email_role(user.email) == user.role and authenticate(user, password):
+        if user and UserService.role_is_allowed_for_email(
+            user.email, user.role
+        ) and authenticate(user, password):
             login_user(user)
             next_url = request.args.get("next", "")
             if next_url.startswith("/") and not next_url.startswith("//"):
