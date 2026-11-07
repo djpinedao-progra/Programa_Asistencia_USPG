@@ -1,14 +1,28 @@
-from flask import flash, redirect, render_template, request, url_for
+import hmac
+
+from flask import abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.controllers import main
 from app.services import ExpoService, UserService
+from app.services.google_login_service import (
+    GoogleLoginConfigurationError,
+    GoogleLoginService,
+)
 
 
 @main.route("/", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("main.dashboard"))
+    # Google puede ser la entrada principal. "acceso=local" mantiene una
+    # alternativa con contraseña para no impedir el acceso durante una incidencia.
+    if (
+        request.method == "GET"
+        and GoogleLoginService.auto_redirect_enabled()
+        and request.args.get("acceso") != "local"
+    ):
+        return redirect(url_for("main.google_login", next=request.args.get("next", "")))
     if request.method == "POST":
         identifier = request.form.get("identifier", "").strip()
         password = request.form.get("password", "")
@@ -26,7 +40,54 @@ def login():
     return render_template(
         "auth/login.html",
         expo_access_enabled=ExpoService().is_registration_enabled(),
+        google_login_enabled=GoogleLoginService.enabled(),
     )
+
+
+@main.get("/auth/google")
+def google_login():
+    """Envía a Google para identificar a la persona sin guardar contraseñas."""
+    if current_user.is_authenticated:
+        return redirect(url_for("main.dashboard"))
+    try:
+        authorization_url, state, code_verifier = GoogleLoginService().authorization_url()
+    except GoogleLoginConfigurationError as error:
+        flash(str(error), "error")
+        return redirect(url_for("main.login", acceso="local"))
+    session["google_login_state"] = state
+    session["google_login_code_verifier"] = code_verifier
+    next_url = request.args.get("next", "")
+    session["google_login_next"] = (
+        next_url if next_url.startswith("/") and not next_url.startswith("//") else ""
+    )
+    return redirect(authorization_url)
+
+
+@main.get("/auth/google/callback")
+def google_login_callback():
+    """Comprueba la respuesta de Google y abre una cuenta ya registrada."""
+    expected_state = session.pop("google_login_state", "")
+    code_verifier = session.pop("google_login_code_verifier", "")
+    received_state = request.args.get("state", "")
+    if not hmac.compare_digest(expected_state, received_state):
+        abort(400)
+    if request.args.get("error"):
+        flash("Google canceló el inicio de sesión.", "warning")
+        return redirect(url_for("main.login", acceso="local"))
+    try:
+        email = GoogleLoginService().verified_email_from_code(
+            request.args.get("code", ""), received_state, code_verifier
+        )
+    except (GoogleLoginConfigurationError, ValueError) as error:
+        flash(str(error), "error")
+        return redirect(url_for("main.login", acceso="local"))
+    user = UserService().find_by_login_identifier(email)
+    if not user or not UserService.role_is_allowed_for_email(user.email, user.role):
+        flash("Tu cuenta de Google no está registrada para usar este sistema.", "error")
+        return redirect(url_for("main.login", acceso="local"))
+    login_user(user)
+    next_url = session.pop("google_login_next", "")
+    return redirect(next_url or url_for("main.dashboard"))
 
 
 @main.route("/registro", methods=["GET", "POST"])

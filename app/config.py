@@ -41,6 +41,20 @@ def load_config(test_config=None):
             "GOOGLE_REDIRECT_URI",
             f"{app_base_url}/admin/google/callback" if app_base_url else "",
         ).strip(),
+        "GOOGLE_LOGIN_ENABLED": os.getenv("GOOGLE_LOGIN_ENABLED", "false")
+        .strip()
+        .lower()
+        in {"1", "true", "yes", "si", "sí"},
+        "GOOGLE_LOGIN_AUTO_REDIRECT": os.getenv(
+            "GOOGLE_LOGIN_AUTO_REDIRECT", "false"
+        )
+        .strip()
+        .lower()
+        in {"1", "true", "yes", "si", "sí"},
+        "GOOGLE_LOGIN_REDIRECT_URI": os.getenv(
+            "GOOGLE_LOGIN_REDIRECT_URI",
+            f"{app_base_url}/auth/google/callback" if app_base_url else "",
+        ).strip(),
         "GOOGLE_TOKEN_ENCRYPTION_KEY": os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY", ""),
         "DB_SCHEMA": os.getenv("DB_SCHEMA", "").strip(),
     }

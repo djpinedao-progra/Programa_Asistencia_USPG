@@ -5,6 +5,7 @@ from app.services.course_enrollment_service import CourseEnrollmentService
 from app.services.course_service import CourseService
 from app.services.expo_service import ExpoService
 from app.services.google_classroom_service import GoogleClassroomService
+from app.services.google_login_service import GoogleLoginService
 from app.services.notice_service import NoticeService
 from app.services.user_service import UserService
 
@@ -16,6 +17,7 @@ __all__ = [
     "CourseService",
     "ExpoService",
     "GoogleClassroomService",
+    "GoogleLoginService",
     "NoticeService",
     "UserService",
 ]

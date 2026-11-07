@@ -27,6 +27,10 @@ services:
         value: 30
       - key: GOOGLE_CLASSROOM_ENABLED
         value: true
+      - key: GOOGLE_LOGIN_ENABLED
+        value: true
+      - key: GOOGLE_LOGIN_AUTO_REDIRECT
+        value: true
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

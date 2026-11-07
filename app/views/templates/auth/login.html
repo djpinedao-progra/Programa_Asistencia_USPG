@@ -26,6 +26,11 @@
       <p class="eyebrow">UNIVERSIDAD SAN PABLO · GUATEMALA</p>
       <h2>Iniciar sesión</h2>
       <p class="muted">Usa las credenciales de tu cuenta institucional.</p>
+      {% if google_login_enabled %}
+      <a class="button button-primary button-wide" href="{{ url_for('main.google_login', next=request.args.get('next', '')) }}">Iniciar sesión con Google <span aria-hidden="true">→</span></a>
+      <p class="muted">Google confirma tu identidad; el sistema no recibe tu contraseña.</p>
+      <div class="login-access-divider"><span>O USA TU CONTRASEÑA</span></div>
+      {% endif %}
       <form method="post" class="stack-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="identifier">Correo o carnet institucional</label>
