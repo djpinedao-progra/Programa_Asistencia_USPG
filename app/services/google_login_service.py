@@ -3,6 +3,7 @@
 from flask import current_app
 from google.auth.transport.requests import AuthorizedSession
 from google_auth_oauthlib.flow import Flow
+from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 
 # Estos permisos solo identifican a la persona. No permiten leer ni cambiar Classroom.
 GOOGLE_LOGIN_SCOPES = ("openid", "email", "profile")
@@ -72,6 +73,14 @@ class GoogleLoginService:
         flow.code_verifier = code_verifier
         try:
             flow.fetch_token(code=code)
+        except OAuth2Error as error:
+            detail = error.description or error.error
+            current_app.logger.warning(
+                "Google rechazÃ³ el intercambio del permiso de inicio de sesiÃ³n: %s",
+                detail,
+            )
+            raise ValueError(f"Google rechazÃ³ el acceso: {detail}.") from error
+        try:
             google_session = AuthorizedSession(flow.credentials)
             response = google_session.get(
                 "https://openidconnect.googleapis.com/v1/userinfo", timeout=10
