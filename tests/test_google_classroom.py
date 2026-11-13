@@ -254,6 +254,43 @@ def test_google_oauth_preserves_pkce_verifier(app, sample_data, login_as, monkey
         assert user_session["google_oauth_code_verifier"] == "pkce-verifier"
 
 
+def test_google_oauth_requests_identity_and_readonly_classroom_permissions(
+    app, sample_data, login_as, monkeypatch
+):
+    _enable_google(app)
+    received = {}
+
+    class FakeFlow:
+        redirect_uri = ""
+        code_verifier = "pkce-verifier"
+
+        def authorization_url(self, **_kwargs):
+            return "https://accounts.google.com/o/oauth2/auth", "oauth-state"
+
+    def fake_from_client_config(_config, **kwargs):
+        received.update(kwargs)
+        return FakeFlow()
+
+    monkeypatch.setattr(
+        "app.services.google_classroom_service.Flow.from_client_config",
+        fake_from_client_config,
+    )
+    client = app.test_client()
+    login_as(client, sample_data["admin_id"])
+
+    response = client.get("/admin/google/connect")
+
+    assert response.status_code == 302
+    assert received["scopes"] == (
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/classroom.courses.readonly",
+        "https://www.googleapis.com/auth/classroom.rosters.readonly",
+        "https://www.googleapis.com/auth/classroom.profile.emails",
+    )
+
+
 def test_imports_course_teacher_and_valid_students_without_duplicates(app, sample_data):
     _enable_google(app)
     with app.app_context():
