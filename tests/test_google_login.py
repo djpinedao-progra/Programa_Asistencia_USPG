@@ -13,10 +13,18 @@ def _enable_google_login(app):
     )
 
 
-def test_login_sends_people_to_google_when_direct_access_is_enabled(app):
+def test_login_keeps_the_choice_screen_when_google_direct_access_is_enabled(app):
     _enable_google_login(app)
 
     response = app.test_client().get("/")
+
+    assert response.status_code == 200
+
+
+def test_login_can_send_people_to_google_when_requested(app):
+    _enable_google_login(app)
+
+    response = app.test_client().get("/?acceso=google")
 
     assert response.status_code == 302
     assert response.headers["Location"].startswith("/auth/google?")

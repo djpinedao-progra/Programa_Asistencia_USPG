@@ -35,7 +35,7 @@ def login():
     if (
         request.method == "GET"
         and GoogleLoginService.auto_redirect_enabled()
-        and request.args.get("acceso") != "local"
+        and request.args.get("acceso") == "google"
     ):
         return redirect(url_for("main.google_login", next=request.args.get("next", "")))
     if request.method == "POST":
@@ -91,7 +91,7 @@ def google_login_callback():
         return _google_login_error("Google canceló el inicio de sesión.")
     try:
         email = GoogleLoginService().verified_email_from_code(
-            request.url, received_state, code_verifier
+            _google_callback_url(), received_state, code_verifier
         )
     except (GoogleLoginConfigurationError, ValueError) as error:
         current_app.logger.warning("Inicio con Google rechazado: %s", error)
@@ -108,6 +108,13 @@ def google_login_callback():
     login_user(user)
     next_url = session.pop("google_login_next", "")
     return redirect(next_url or url_for("main.dashboard"))
+
+
+def _google_callback_url():
+    """Reconstruye la direcciÃ³n pÃºblica para no usar el HTTP interno de Render."""
+    callback_url = current_app.config["GOOGLE_LOGIN_REDIRECT_URI"]
+    query_string = request.query_string.decode("utf-8")
+    return f"{callback_url}?{query_string}" if query_string else callback_url
 
 
 @main.route("/registro", methods=["GET", "POST"])
