@@ -79,8 +79,8 @@ def test_google_login_checks_the_verified_email_with_google(app, monkeypatch):
     class FakeFlow:
         credentials = object()
 
-        def fetch_token(self, code):
-            assert code == "one-code"
+        def fetch_token(self, authorization_response):
+            assert "code=one-code" in authorization_response
 
     class FakeResponse:
         def raise_for_status(self):
@@ -108,5 +108,7 @@ def test_google_login_checks_the_verified_email_with_google(app, monkeypatch):
     )
 
     assert GoogleLoginService().verified_email_from_code(
-        "one-code", "safe-state", "safe-verifier"
+        "https://staging.example/auth/google/callback?code=one-code",
+        "safe-state",
+        "safe-verifier",
     ) == "alumno@alumno.uspg.edu.gt"

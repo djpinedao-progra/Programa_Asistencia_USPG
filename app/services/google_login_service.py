@@ -61,10 +61,10 @@ class GoogleLoginService:
         )
         return url, state, flow.code_verifier
 
-    def verified_email_from_code(self, code, state, code_verifier):
+    def verified_email_from_code(self, authorization_response, state, code_verifier):
         """Recibe el código de Google y devuelve solo un correo ya comprobado."""
         self.require_available()
-        if not code or not code_verifier:
+        if not authorization_response or not code_verifier:
             raise ValueError("Google no envió la información necesaria para iniciar sesión.")
         flow = Flow.from_client_config(
             self._client_config(), scopes=GOOGLE_LOGIN_SCOPES, state=state
@@ -72,7 +72,7 @@ class GoogleLoginService:
         flow.redirect_uri = current_app.config["GOOGLE_LOGIN_REDIRECT_URI"]
         flow.code_verifier = code_verifier
         try:
-            flow.fetch_token(code=code)
+            flow.fetch_token(authorization_response=authorization_response)
         except OAuth2Error as error:
             detail = error.description or error.error
             current_app.logger.warning(

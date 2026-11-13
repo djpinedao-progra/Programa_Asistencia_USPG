@@ -91,7 +91,7 @@ def google_login_callback():
         return _google_login_error("Google canceló el inicio de sesión.")
     try:
         email = GoogleLoginService().verified_email_from_code(
-            request.args.get("code", ""), received_state, code_verifier
+            request.url, received_state, code_verifier
         )
     except (GoogleLoginConfigurationError, ValueError) as error:
         current_app.logger.warning("Inicio con Google rechazado: %s", error)
