@@ -56,8 +56,9 @@ class GoogleLoginService:
         self.require_available()
         flow = Flow.from_client_config(self._client_config(), scopes=GOOGLE_LOGIN_SCOPES)
         flow.redirect_uri = current_app.config["GOOGLE_LOGIN_REDIRECT_URI"]
+        # El inicio de sesiÃ³n pide solo identidad; no mezcla permisos de Classroom.
         url, state = flow.authorization_url(
-            access_type="online", include_granted_scopes="true", prompt="select_account"
+            access_type="online", prompt="select_account"
         )
         return url, state, flow.code_verifier
 

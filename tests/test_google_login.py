@@ -30,6 +30,30 @@ def test_login_can_send_people_to_google_when_requested(app):
     assert response.headers["Location"].startswith("/auth/google?")
 
 
+def test_google_login_asks_only_for_identity_permissions(app, monkeypatch):
+    _enable_google_login(app)
+    received = {}
+
+    class FakeFlow:
+        code_verifier = "safe-verifier"
+
+        def authorization_url(self, **kwargs):
+            received.update(kwargs)
+            return "https://accounts.google.test/authorize", "safe-state"
+
+    monkeypatch.setattr(
+        "app.services.google_login_service.Flow.from_client_config",
+        lambda *_args, **_kwargs: FakeFlow(),
+    )
+
+    url, state, verifier = GoogleLoginService().authorization_url()
+
+    assert url == "https://accounts.google.test/authorize"
+    assert state == "safe-state"
+    assert verifier == "safe-verifier"
+    assert received == {"access_type": "online", "prompt": "select_account"}
+
+
 def test_google_callback_opens_the_registered_account(app, sample_data, monkeypatch):
     _enable_google_login(app)
     monkeypatch.setattr(
