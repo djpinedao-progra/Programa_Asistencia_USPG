@@ -20,6 +20,12 @@ from app.services.google_login_service import (
 )
 
 
+def _google_login_error(message):
+    """Regresa a la pantalla local y conserva el mensaje de Google."""
+    flash(message, "error")
+    return redirect(url_for("main.login", acceso="local", error_google=message))
+
+
 @main.route("/", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
@@ -50,6 +56,7 @@ def login():
         "auth/login.html",
         expo_access_enabled=ExpoService().is_registration_enabled(),
         google_login_enabled=GoogleLoginService.enabled(),
+        google_login_error=request.args.get("error_google", "").strip(),
     )
 
 
@@ -61,8 +68,7 @@ def google_login():
     try:
         authorization_url, state, code_verifier = GoogleLoginService().authorization_url()
     except GoogleLoginConfigurationError as error:
-        flash(str(error), "error")
-        return redirect(url_for("main.login", acceso="local"))
+        return _google_login_error(str(error))
     session["google_login_state"] = state
     session["google_login_code_verifier"] = code_verifier
     next_url = request.args.get("next", "")
@@ -82,22 +88,23 @@ def google_login_callback():
         abort(400)
     if request.args.get("error"):
         flash("Google canceló el inicio de sesión.", "warning")
-        return redirect(url_for("main.login", acceso="local"))
+        return _google_login_error("Google canceló el inicio de sesión.")
     try:
         email = GoogleLoginService().verified_email_from_code(
             request.args.get("code", ""), received_state, code_verifier
         )
     except (GoogleLoginConfigurationError, ValueError) as error:
         current_app.logger.warning("Inicio con Google rechazado: %s", error)
-        flash(str(error), "error")
-        return redirect(url_for("main.login", acceso="local"))
+        return _google_login_error(str(error))
     user = UserService().find_by_login_identifier(email)
     if not user or not UserService.role_is_allowed_for_email(user.email, user.role):
         current_app.logger.warning(
             "Inicio con Google rechazado para una cuenta no registrada: %s", email
         )
         flash("Tu cuenta de Google no está registrada para usar este sistema.", "error")
-        return redirect(url_for("main.login", acceso="local"))
+        return _google_login_error(
+            "Tu cuenta de Google no está registrada para usar este sistema."
+        )
     login_user(user)
     next_url = session.pop("google_login_next", "")
     return redirect(next_url or url_for("main.dashboard"))

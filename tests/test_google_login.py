@@ -67,4 +67,5 @@ def test_google_login_refuses_an_account_that_is_not_registered(
     response = client.get("/auth/google/callback?state=safe-state&code=one-code")
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/?acceso=local")
+    assert "acceso=local" in response.headers["Location"]
+    assert "error_google=Tu+cuenta+de+Google" in response.headers["Location"]
