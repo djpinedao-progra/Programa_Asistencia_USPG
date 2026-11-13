@@ -6,7 +6,12 @@ from google_auth_oauthlib.flow import Flow
 from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 
 # Estos permisos solo identifican a la persona. No permiten leer ni cambiar Classroom.
-GOOGLE_LOGIN_SCOPES = ("openid", "email", "profile")
+# Se usan los nombres completos que Google devuelve al finalizar el inicio.
+GOOGLE_LOGIN_SCOPES = (
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+)
 
 
 class GoogleLoginConfigurationError(ValueError):

@@ -54,6 +54,34 @@ def test_google_login_asks_only_for_identity_permissions(app, monkeypatch):
     assert received == {"access_type": "online", "prompt": "select_account"}
 
 
+def test_google_login_uses_the_scope_names_returned_by_google(app, monkeypatch):
+    _enable_google_login(app)
+    received = {}
+
+    class FakeFlow:
+        code_verifier = "safe-verifier"
+
+        def authorization_url(self, **_kwargs):
+            return "https://accounts.google.test/authorize", "safe-state"
+
+    def fake_from_client_config(_config, **kwargs):
+        received.update(kwargs)
+        return FakeFlow()
+
+    monkeypatch.setattr(
+        "app.services.google_login_service.Flow.from_client_config",
+        fake_from_client_config,
+    )
+
+    GoogleLoginService().authorization_url()
+
+    assert received["scopes"] == (
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+    )
+
+
 def test_google_callback_opens_the_registered_account(app, sample_data, monkeypatch):
     _enable_google_login(app)
     monkeypatch.setattr(
