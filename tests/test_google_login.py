@@ -1,5 +1,7 @@
 """Pruebas del acceso con la cuenta institucional de Google."""
 
+from app.services.google_login_service import GoogleLoginService
+
 
 def _enable_google_login(app):
     app.config.update(
@@ -69,3 +71,42 @@ def test_google_login_refuses_an_account_that_is_not_registered(
     assert response.status_code == 302
     assert "acceso=local" in response.headers["Location"]
     assert "error_google=Tu+cuenta+de+Google" in response.headers["Location"]
+
+
+def test_google_login_checks_the_verified_email_with_google(app, monkeypatch):
+    _enable_google_login(app)
+
+    class FakeFlow:
+        credentials = object()
+
+        def fetch_token(self, code):
+            assert code == "one-code"
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "email": "Alumno@Alumno.USPG.edu.gt",
+                "email_verified": True,
+            }
+
+    class FakeGoogleSession:
+        def get(self, url, timeout):
+            assert url == "https://openidconnect.googleapis.com/v1/userinfo"
+            assert timeout == 10
+            return FakeResponse()
+
+    monkeypatch.setattr(
+        "app.services.google_login_service.Flow.from_client_config",
+        lambda *_args, **_kwargs: FakeFlow(),
+    )
+    monkeypatch.setattr(
+        "app.services.google_login_service.AuthorizedSession",
+        lambda _credentials: FakeGoogleSession(),
+    )
+
+    assert GoogleLoginService().verified_email_from_code(
+        "one-code", "safe-state", "safe-verifier"
+    ) == "alumno@alumno.uspg.edu.gt"

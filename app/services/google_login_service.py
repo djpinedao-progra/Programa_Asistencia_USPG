@@ -1,8 +1,7 @@
 """Inicio de sesión con Google para cuentas institucionales ya registradas."""
 
 from flask import current_app
-from google.auth.transport.requests import Request as GoogleAuthRequest
-from google.oauth2 import id_token
+from google.auth.transport.requests import AuthorizedSession
 from google_auth_oauthlib.flow import Flow
 
 # Estos permisos solo identifican a la persona. No permiten leer ni cambiar Classroom.
@@ -73,11 +72,12 @@ class GoogleLoginService:
         flow.code_verifier = code_verifier
         try:
             flow.fetch_token(code=code)
-            token = id_token.verify_oauth2_token(
-                flow.credentials.id_token,
-                GoogleAuthRequest(),
-                current_app.config["GOOGLE_CLIENT_ID"],
+            google_session = AuthorizedSession(flow.credentials)
+            response = google_session.get(
+                "https://openidconnect.googleapis.com/v1/userinfo", timeout=10
             )
+            response.raise_for_status()
+            token = response.json()
         except Exception as error:
             current_app.logger.warning(
                 "Google no permitió comprobar el token de inicio de sesión.",
@@ -85,8 +85,12 @@ class GoogleLoginService:
             )
             raise ValueError("No fue posible comprobar tu identidad con Google.") from error
         email = str(token.get("email", "")).strip().lower()
-        if not email or not token.get("email_verified"):
+        email_verified = token.get("email_verified", token.get("verified_email", False))
+        if not email or not email_verified:
             raise ValueError("Google no confirmó un correo electrónico válido.")
-        if not email.endswith("@uspg.edu.gt"):
+        domain = email.rsplit("@", 1)[-1]
+        if domain not in {"uspg.edu", "uspg.edu.gt"} and not domain.endswith(
+            ".uspg.edu.gt"
+        ):
             raise ValueError("Usa una cuenta institucional de USPG para iniciar sesión.")
         return email
