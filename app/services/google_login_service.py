@@ -79,6 +79,10 @@ class GoogleLoginService:
                 current_app.config["GOOGLE_CLIENT_ID"],
             )
         except Exception as error:
+            current_app.logger.warning(
+                "Google no permitió comprobar el token de inicio de sesión.",
+                exc_info=True,
+            )
             raise ValueError("No fue posible comprobar tu identidad con Google.") from error
         email = str(token.get("email", "")).strip().lower()
         if not email or not token.get("email_verified"):

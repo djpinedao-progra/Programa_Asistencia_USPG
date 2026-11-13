@@ -1,6 +1,15 @@
 import hmac
 
-from flask import abort, flash, redirect, render_template, request, session, url_for
+from flask import (
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.controllers import main
@@ -79,10 +88,14 @@ def google_login_callback():
             request.args.get("code", ""), received_state, code_verifier
         )
     except (GoogleLoginConfigurationError, ValueError) as error:
+        current_app.logger.warning("Inicio con Google rechazado: %s", error)
         flash(str(error), "error")
         return redirect(url_for("main.login", acceso="local"))
     user = UserService().find_by_login_identifier(email)
     if not user or not UserService.role_is_allowed_for_email(user.email, user.role):
+        current_app.logger.warning(
+            "Inicio con Google rechazado para una cuenta no registrada: %s", email
+        )
         flash("Tu cuenta de Google no está registrada para usar este sistema.", "error")
         return redirect(url_for("main.login", acceso="local"))
     login_user(user)
