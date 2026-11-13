@@ -120,3 +120,27 @@ def test_google_login_checks_the_verified_email_with_google(app, monkeypatch):
         "safe-state",
         "safe-verifier",
     ) == "alumno@alumno.uspg.edu.gt"
+
+
+def test_google_callback_shows_a_safe_message_for_an_unexpected_error(
+    app, sample_data, monkeypatch
+):
+    _enable_google_login(app)
+
+    def fail_to_read_google_response(*_args):
+        raise RuntimeError("technical detail")
+
+    monkeypatch.setattr(
+        "app.controllers.auth_controller.GoogleLoginService.verified_email_from_code",
+        fail_to_read_google_response,
+    )
+    client = app.test_client()
+    with client.session_transaction() as user_session:
+        user_session["google_login_state"] = "safe-state"
+        user_session["google_login_code_verifier"] = "safe-verifier"
+
+    response = client.get("/auth/google/callback?state=safe-state&code=one-code")
+
+    assert response.status_code == 302
+    assert "error_google=No+fue+posible+terminar" in response.headers["Location"]
+    assert "RuntimeError" in response.headers["Location"]

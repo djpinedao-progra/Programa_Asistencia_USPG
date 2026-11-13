@@ -96,6 +96,12 @@ def google_login_callback():
     except (GoogleLoginConfigurationError, ValueError) as error:
         current_app.logger.warning("Inicio con Google rechazado: %s", error)
         return _google_login_error(str(error))
+    except Exception as error:
+        current_app.logger.exception("Error inesperado al recibir el inicio con Google.")
+        return _google_login_error(
+            "No fue posible terminar el inicio con Google "
+            f"({type(error).__name__})."
+        )
     user = UserService().find_by_login_identifier(email)
     if not user or not UserService.role_is_allowed_for_email(user.email, user.role):
         current_app.logger.warning(
