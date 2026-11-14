@@ -5,6 +5,8 @@ from google.auth.transport.requests import AuthorizedSession
 from google_auth_oauthlib.flow import Flow
 from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 
+from app.services.google_classroom_service import CLASSROOM_SCOPES
+
 # Estos permisos solo identifican a la persona. No permiten leer ni cambiar Classroom.
 # Se usan los nombres completos que Google devuelve al finalizar el inicio.
 GOOGLE_LOGIN_SCOPES = (
@@ -28,6 +30,16 @@ class GoogleLoginService:
         return GoogleLoginService.enabled() and bool(
             current_app.config.get("GOOGLE_LOGIN_AUTO_REDIRECT")
         )
+
+    @staticmethod
+    def classroom_login_enabled():
+        """Indica si el inicio con Google pide también lectura de Classroom."""
+        return bool(current_app.config.get("GOOGLE_CLASSROOM_ENABLED"))
+
+    @classmethod
+    def requested_scopes(cls):
+        """Usa los permisos de Classroom solo cuando la integración está activa."""
+        return CLASSROOM_SCOPES if cls.classroom_login_enabled() else GOOGLE_LOGIN_SCOPES
 
     @staticmethod
     def _client_config():
@@ -59,21 +71,31 @@ class GoogleLoginService:
     def authorization_url(self):
         """Crea un enlace de un solo uso hacia la página segura de Google."""
         self.require_available()
-        flow = Flow.from_client_config(self._client_config(), scopes=GOOGLE_LOGIN_SCOPES)
+        flow = Flow.from_client_config(
+            self._client_config(), scopes=self.requested_scopes()
+        )
         flow.redirect_uri = current_app.config["GOOGLE_LOGIN_REDIRECT_URI"]
-        # El inicio de sesiÃ³n pide solo identidad; no mezcla permisos de Classroom.
+        # Si Classroom está activo, Google entrega sus permisos de lectura en este mismo paso.
         url, state = flow.authorization_url(
-            access_type="online", prompt="select_account"
+            access_type="offline",
+            include_granted_scopes="true",
+            prompt=(
+                "select_account consent"
+                if self.classroom_login_enabled()
+                else "select_account"
+            ),
         )
         return url, state, flow.code_verifier
 
-    def verified_email_from_code(self, authorization_response, state, code_verifier):
+    def verified_google_account_from_code(
+        self, authorization_response, state, code_verifier
+    ):
         """Recibe el código de Google y devuelve solo un correo ya comprobado."""
         self.require_available()
         if not authorization_response or not code_verifier:
             raise ValueError("Google no envió la información necesaria para iniciar sesión.")
         flow = Flow.from_client_config(
-            self._client_config(), scopes=GOOGLE_LOGIN_SCOPES, state=state
+            self._client_config(), scopes=self.requested_scopes(), state=state
         )
         flow.redirect_uri = current_app.config["GOOGLE_LOGIN_REDIRECT_URI"]
         flow.code_verifier = code_verifier
@@ -108,4 +130,11 @@ class GoogleLoginService:
             ".uspg.edu.gt"
         ):
             raise ValueError("Usa una cuenta institucional de USPG para iniciar sesión.")
+        return email, flow.credentials
+
+    def verified_email_from_code(self, authorization_response, state, code_verifier):
+        """Conserva la consulta de correo para código que aún la usa."""
+        email, _credentials = self.verified_google_account_from_code(
+            authorization_response, state, code_verifier
+        )
         return email

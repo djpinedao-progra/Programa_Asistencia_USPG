@@ -163,6 +163,11 @@ class GoogleClassroomService:
         db.session.commit()
         return connection
 
+    def save_login_credentials(self, credentials, google_email=""):
+        """Guarda la autorización obtenida durante el inicio con Google."""
+        self.require_available()
+        return self._save_credentials(credentials, google_email)
+
     def connection(self):
         # Busca la conexión de Google que pertenece al administrador actual.
         return db.session.scalar(

@@ -13,7 +13,7 @@ from flask import (
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.controllers import main
-from app.services import ExpoService, UserService
+from app.services import ExpoService, GoogleClassroomService, UserService
 from app.services.google_login_service import (
     GoogleLoginConfigurationError,
     GoogleLoginService,
@@ -90,7 +90,7 @@ def google_login_callback():
         flash("Google canceló el inicio de sesión.", "warning")
         return _google_login_error("Google canceló el inicio de sesión.")
     try:
-        email = GoogleLoginService().verified_email_from_code(
+        email, credentials = GoogleLoginService().verified_google_account_from_code(
             _google_callback_url(), received_state, code_verifier
         )
     except (GoogleLoginConfigurationError, ValueError) as error:
@@ -111,6 +111,21 @@ def google_login_callback():
         return _google_login_error(
             "Tu cuenta de Google no está registrada para usar este sistema."
         )
+    # Una cuenta con permiso de Classroom queda conectada al iniciar con Google.
+    if (
+        GoogleLoginService.classroom_login_enabled()
+        and (user.role == "admin" or user.google_classroom_access)
+    ):
+        try:
+            GoogleClassroomService(user.id).save_login_credentials(credentials, email)
+        except (ValueError, GoogleLoginConfigurationError) as error:
+            current_app.logger.warning(
+                "La cuenta inició sesión, pero no se pudo guardar Classroom: %s", error
+            )
+            flash(
+                "Iniciaste sesión, pero no fue posible guardar la conexión con Classroom.",
+                "warning",
+            )
     login_user(user)
     next_url = session.pop("google_login_next", "")
     return redirect(next_url or url_for("main.dashboard"))

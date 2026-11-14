@@ -1,5 +1,6 @@
 """Pruebas del acceso con la cuenta institucional de Google."""
 
+from app.services import UserService
 from app.services.google_login_service import GoogleLoginService
 
 
@@ -30,7 +31,7 @@ def test_login_can_send_people_to_google_when_requested(app):
     assert response.headers["Location"].startswith("/auth/google?")
 
 
-def test_google_login_asks_only_for_identity_permissions(app, monkeypatch):
+def test_google_login_asks_for_identity_permissions(app, monkeypatch):
     _enable_google_login(app)
     received = {}
 
@@ -51,7 +52,11 @@ def test_google_login_asks_only_for_identity_permissions(app, monkeypatch):
     assert url == "https://accounts.google.test/authorize"
     assert state == "safe-state"
     assert verifier == "safe-verifier"
-    assert received == {"access_type": "online", "prompt": "select_account"}
+    assert received == {
+        "access_type": "offline",
+        "include_granted_scopes": "true",
+        "prompt": "select_account",
+    }
 
 
 def test_google_login_uses_the_scope_names_returned_by_google(app, monkeypatch):
@@ -85,8 +90,8 @@ def test_google_login_uses_the_scope_names_returned_by_google(app, monkeypatch):
 def test_google_callback_opens_the_registered_account(app, sample_data, monkeypatch):
     _enable_google_login(app)
     monkeypatch.setattr(
-        "app.controllers.auth_controller.GoogleLoginService.verified_email_from_code",
-        lambda *_args: "alumno@alumno.uspg.edu.gt",
+        "app.controllers.auth_controller.GoogleLoginService.verified_google_account_from_code",
+        lambda *_args: ("alumno@alumno.uspg.edu.gt", object()),
     )
     client = app.test_client()
     with client.session_transaction() as user_session:
@@ -118,8 +123,8 @@ def test_google_login_refuses_an_account_that_is_not_registered(
 ):
     _enable_google_login(app)
     monkeypatch.setattr(
-        "app.controllers.auth_controller.GoogleLoginService.verified_email_from_code",
-        lambda *_args: "nadie@alumno.uspg.edu.gt",
+        "app.controllers.auth_controller.GoogleLoginService.verified_google_account_from_code",
+        lambda *_args: ("nadie@alumno.uspg.edu.gt", object()),
     )
     client = app.test_client()
     with client.session_transaction() as user_session:
@@ -183,7 +188,7 @@ def test_google_callback_shows_a_safe_message_for_an_unexpected_error(
         raise RuntimeError("technical detail")
 
     monkeypatch.setattr(
-        "app.controllers.auth_controller.GoogleLoginService.verified_email_from_code",
+        "app.controllers.auth_controller.GoogleLoginService.verified_google_account_from_code",
         fail_to_read_google_response,
     )
     client = app.test_client()
@@ -196,3 +201,72 @@ def test_google_callback_shows_a_safe_message_for_an_unexpected_error(
     assert response.status_code == 302
     assert "error_google=No+fue+posible+terminar" in response.headers["Location"]
     assert "RuntimeError" in response.headers["Location"]
+
+
+def test_google_login_includes_classroom_read_permissions_when_enabled(app, monkeypatch):
+    _enable_google_login(app)
+    app.config["GOOGLE_CLASSROOM_ENABLED"] = True
+    received = {}
+
+    class FakeFlow:
+        code_verifier = "safe-verifier"
+
+        def authorization_url(self, **_kwargs):
+            return "https://accounts.google.test/authorize", "safe-state"
+
+    def fake_from_client_config(_config, **kwargs):
+        received.update(kwargs)
+        return FakeFlow()
+
+    monkeypatch.setattr(
+        "app.services.google_login_service.Flow.from_client_config",
+        fake_from_client_config,
+    )
+
+    GoogleLoginService().authorization_url()
+
+    assert "https://www.googleapis.com/auth/classroom.courses.readonly" in received[
+        "scopes"
+    ]
+    assert "https://www.googleapis.com/auth/classroom.rosters.readonly" in received[
+        "scopes"
+    ]
+
+
+def test_google_login_saves_classroom_for_an_authorized_account(
+    app, sample_data, monkeypatch
+):
+    _enable_google_login(app)
+    app.config.update(
+        GOOGLE_CLASSROOM_ENABLED=True,
+        GOOGLE_TOKEN_ENCRYPTION_KEY="test-encryption-secret",
+    )
+    with app.app_context():
+        student = UserService().users.find_by_id(sample_data["student_id"])
+        student.google_classroom_access = True
+        UserService().users.save(student)
+
+    saved = {}
+    monkeypatch.setattr(
+        "app.controllers.auth_controller.GoogleLoginService.verified_google_account_from_code",
+        lambda *_args: ("alumno@alumno.uspg.edu.gt", "google-credentials"),
+    )
+    monkeypatch.setattr(
+        "app.controllers.auth_controller.GoogleClassroomService.save_login_credentials",
+        lambda service, credentials, email: saved.update(
+            user_id=service.admin_user_id, credentials=credentials, email=email
+        ),
+    )
+    client = app.test_client()
+    with client.session_transaction() as user_session:
+        user_session["google_login_state"] = "safe-state"
+        user_session["google_login_code_verifier"] = "safe-verifier"
+
+    response = client.get("/auth/google/callback?state=safe-state&code=one-code")
+
+    assert response.status_code == 302
+    assert saved == {
+        "user_id": sample_data["student_id"],
+        "credentials": "google-credentials",
+        "email": "alumno@alumno.uspg.edu.gt",
+    }

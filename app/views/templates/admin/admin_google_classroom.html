@@ -17,9 +17,9 @@
 </section>
 {% elif not connection %}
 <section class="admin-data-section classroom-connect-panel">
-  <h2>Conectar cuenta institucional</h2>
-  <p>Google solicitará autorización para leer cursos, listas y correos. El sistema no podrá modificar Classroom.</p>
-  <a class="button button-primary" href="{{ url_for('main.admin_google_connect') }}">Conectar con Google Classroom</a>
+  <h2>Conexión pendiente</h2>
+  <p>La conexión con Classroom se crea automáticamente al iniciar sesión con Google. Cierra sesión e ingresa de nuevo con tu cuenta institucional para completar la autorización.</p>
+  <p class="muted">El sistema solo solicita permisos de lectura y no puede modificar Google Classroom.</p>
 </section>
 {% else %}
 <section class="admin-data-section classroom-connection">
