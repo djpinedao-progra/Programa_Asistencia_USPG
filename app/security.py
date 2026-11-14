@@ -25,7 +25,9 @@ def enforce_account_domain():
     if current_user.is_authenticated:
         from app.services import UserService
 
-        if UserService.email_role(current_user.email) != current_user.role:
+        if not UserService.role_is_allowed_for_email(
+            current_user.email, current_user.role
+        ):
             logout_user()
             abort(403, description="El correo institucional no corresponde al rol de la cuenta.")
 

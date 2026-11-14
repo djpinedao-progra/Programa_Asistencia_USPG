@@ -54,6 +54,8 @@ def test_catedratico_can_be_created_as_administrator_by_an_admin(app, csrf_token
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/panel")
+    # La cuenta de catedrática administradora debe conservar la sesión al abrir el panel.
+    assert client.get("/panel").status_code == 302
 
 
 def test_plain_student_cannot_open_google_classroom(app, sample_data, login_as):
